@@ -4,6 +4,9 @@
 
 Santa Fe Spatial Chat is a natural language interface for exploring spatial data about Santa Fe, New Mexico. Type a question like *"Show me vacant residential parcels within 500 meters of a bus stop"* and see the results on an interactive map with a plain-English explanation.
 
+![Santa Fe Spatial Chat Screenshot](./santa-fe-spatial-chat.png)
+
+
 ---
 
 ## Why This Project?
