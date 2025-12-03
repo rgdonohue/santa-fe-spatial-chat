@@ -267,7 +267,14 @@ export type WildfireRiskCollection = FeatureCollection<
 /**
  * Field type definitions for schema validation
  */
-export type FieldType = 'string' | 'number' | 'boolean' | 'string[]' | 'null';
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'string[]'
+  | 'null'
+  | 'string | null'
+  | 'number | null';
 
 /**
  * Layer schema for validation and API documentation
