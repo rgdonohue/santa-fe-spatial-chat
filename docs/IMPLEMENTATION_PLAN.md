@@ -9,25 +9,33 @@
 
 ## Current State Assessment
 
-**Verified**: Ground-zero state confirmed. Only `docs/` directory exists with planning documents.
+**Last Updated**: Check project structure to verify current state
 
 ### ✅ What Exists
 - **Architecture documentation** — Complete technical design with housing focus
 - **Build plan** — 8-week structured roadmap + Week 9 housing stretch goals
 - **Data sources** — Documented datasets (some TBDs need filling)
 - **Project vision** — Clear goals focused on housing equity in Santa Fe
-- **Directory structure**: Only `docs/` exists; no `api/`, `web/`, `shared/`, `scripts/` yet
+- **Directory structure**: `api/`, `web/`, `shared/`, `scripts/` directories created
+- **API setup**: `api/package.json` exists with Hono and TypeScript dependencies
+- **API config**: `api/tsconfig.json` exists (needs configuration per Week 1 steps)
 
-### ❌ What's Missing (Ground Zero)
-- No `api/` directory or package.json
-- No `web/` directory or package.json
-- No `shared/` directory
-- No `scripts/` directory
-- No dependencies installed
-- No data files
-- No development environment configured
+### ⚠️ In Progress / Needs Completion
+- `api/tsconfig.json` — ✅ Configured (edge-ready with `moduleResolution: "NodeNext"`)
+- `api/src/index.ts` — ⚠️ **File has corrupted content** (contains markdown code blocks) - needs to be replaced with clean TypeScript code from step 4
+- `web/tsconfig.app.json` — ✅ Updated with strict options
+- `web/src/App.tsx` — Needs update to use MapView (step 9)
+- `web/src/components/MapView/index.tsx` — Needs to be created (step 8)
+- ESLint/Prettier — Needs configuration in both projects (steps 10-12)
+- Development environment — Needs verification that both apps run
 
-**Status**: Ready to begin Week 1 from scratch.
+### ❌ What's Missing
+- No data files yet
+- No domain types defined (`shared/types/geo.ts`)
+- No DuckDB setup
+- No LLM integration
+
+**Status**: Week 1 setup in progress. Follow remaining Week 1 tasks to complete initialization.
 
 ---
 
@@ -61,7 +69,7 @@
    ```bash
    cd api
    npm init -y
-   npm install hono
+   npm install hono @hono/node-server
    npm install -D typescript @types/node tsx nodemon
    ```
 
@@ -87,9 +95,13 @@
    }
    ```
 
-4. **Create `api/src/index.ts`** (basic Hono app)
+4. **Create `api/src/index.ts`** (basic Hono app with server)
+   
+   **Important**: If the file already exists with corrupted content (markdown code blocks), replace it entirely with this clean code:
+   
    ```typescript
    import { Hono } from 'hono';
+   import { serve } from '@hono/node-server';
 
    const app = new Hono();
 
@@ -97,10 +109,25 @@
      return c.json({ status: 'ok' });
    });
 
-   export default app;
+   const port = Number(process.env.PORT) || 3000;
+   console.log(`Server is running on port ${port}`);
+
+   serve({
+     fetch: app.fetch,
+     port,
+   });
+   ```
+   
+   **Note**: The `@hono/node-server` package should already be installed from step 2. If not, run:
+   ```bash
+   npm install @hono/node-server
    ```
 
 5. **Add scripts to `api/package.json`**
+   
+   **Important**: If `package.json` already has a `"scripts"` key, merge the new scripts into the existing one. Do NOT create a duplicate `"scripts"` key (invalid JSON).
+   
+   The scripts section should look like:
    ```json
    {
      "scripts": {
@@ -111,6 +138,8 @@
      }
    }
    ```
+   
+   If you see a duplicate `"scripts"` key, remove one and merge the contents.
 
 6. **Initialize Web project**
    ```bash
@@ -121,18 +150,20 @@
    npm install -D @types/maplibre-gl
    ```
 
-7. **Update `web/tsconfig.json`** (add strict options)
+7. **Update `web/tsconfig.app.json`** (add strict options)
    ```json
    {
      "compilerOptions": {
-       "strict": true,
-       "noUncheckedIndexedAccess": true,
-       "noImplicitReturns": true,
-       "moduleResolution": "NodeNext",
-       // ... keep other Vite defaults
+       // ... existing Vite options ...
+       "strict": true,  // Already present
+       "noUncheckedIndexedAccess": true,  // Add this
+       "noImplicitReturns": true,  // Add this
+       // Note: moduleResolution stays "bundler" (Vite's default, not "NodeNext")
      }
    }
    ```
+   
+   **Note**: Vite uses project references (`tsconfig.app.json` for app code, `tsconfig.node.json` for config). Update `tsconfig.app.json`, not the root `tsconfig.json`.
 
 8. **Create `web/src/components/MapView/index.tsx`** (basic map)
    ```typescript
@@ -160,10 +191,13 @@
      return <div ref={mapContainer} style={{ width: '100%', height: '100vh' }} />;
    }
    ```
+   
+   **Note**: Create the file at `web/src/components/MapView/index.tsx` (the directory should already exist from step 1).
 
 9. **Update `web/src/App.tsx`** (use MapView)
    ```typescript
    import { MapView } from './components/MapView';
+   import './App.css';
 
    function App() {
      return <MapView />;
@@ -171,6 +205,8 @@
 
    export default App;
    ```
+   
+   **Note**: Replace the default Vite template content with this. The `App.css` import can stay for future styling.
 
 10. **Set up ESLint/Prettier** (both projects)
     ```bash
