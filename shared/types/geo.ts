@@ -274,7 +274,8 @@ export type FieldType =
   | 'string[]'
   | 'null'
   | 'string | null'
-  | 'number | null';
+  | 'number | null'
+  | 'boolean | null';
 
 /**
  * Layer schema for validation and API documentation
