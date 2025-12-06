@@ -1,0 +1,9 @@
+{
+  "name": "santa-fe-spatial-chat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "fetch-data": "cd api && npx tsx ../scripts/fetch-public-data.ts",
+    "prepare-data": "cd api && npx tsx ../scripts/prepare-data.ts"
+  }
+}
