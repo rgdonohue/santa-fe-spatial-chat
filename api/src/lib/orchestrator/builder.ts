@@ -92,14 +92,15 @@ export class QueryBuilder {
         }
       }
     } else {
-      // Regular query: select specified fields or all
+      // Regular query: select specified fields or all (excluding internal geom columns)
       if (this.query.selectFields && this.query.selectFields.length > 0) {
         const selectFields = this.query.selectFields.map((f) =>
           this.escapeIdentifier(f)
         );
         fields.push(...selectFields);
       } else {
-        fields.push('*');
+        // Exclude the internal geometry columns (they'll be output as GeoJSON)
+        fields.push('* EXCLUDE (geom_4326, geom_utm13)');
       }
     }
 
@@ -196,7 +197,7 @@ export class QueryBuilder {
     const targetGeom = useProjected ? 'target_geom_utm13' : 'target_geom_4326';
 
     switch (filter.op) {
-      case 'within_distance':
+      case 'within_distance': {
         if (!filter.distance) {
           throw new Error('within_distance requires distance parameter');
         }
@@ -206,6 +207,7 @@ export class QueryBuilder {
           (${targetSubquery}),
           ${distanceParam}
         )`;
+      }
 
       case 'intersects':
         return `ST_Intersects(
@@ -225,18 +227,20 @@ export class QueryBuilder {
           (${targetSubquery})
         )`;
 
-      case 'nearest':
+      case 'nearest': {
         // Nearest requires ORDER BY and LIMIT, handled differently
         // For now, use a subquery approach
         if (!filter.limit) {
           throw new Error('nearest requires limit parameter');
         }
-        const limitParam = this.addParam(filter.limit);
+        // Note: limitParam not currently used - nearest uses fixed distance approach
+        // TODO: Implement proper nearest neighbor query with ORDER BY distance LIMIT
         return `ST_DWithin(
           ${sourceGeom},
           (${targetSubquery}),
           10000
         )`; // Use a large distance, then order by distance and limit
+      }
 
       default:
         throw new Error(`Unsupported spatial operation: ${filter.op}`);

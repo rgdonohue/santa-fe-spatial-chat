@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import layers from './routes/layers';
-import queryRoute, { setDatabase } from './routes/query';
+import queryRoute, { setDatabase as setQueryDatabase } from './routes/query';
+import chatRoute, { setDatabase as setChatDatabase } from './routes/chat';
+import templatesRoute from './routes/templates';
 import { initDatabase } from './lib/db/init';
 import { join } from 'path';
 
@@ -12,8 +14,10 @@ app.get('/api/health', (c) => {
 });
 
 // Mount routes
-app.route('/api', layers);
-app.route('/api', queryRoute);
+app.route('/api/layers', layers);
+app.route('/api/query', queryRoute);
+app.route('/api/chat', chatRoute);
+app.route('/api/templates', templatesRoute);
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -23,7 +27,8 @@ async function startServer() {
     console.log('Initializing DuckDB...');
     const dataDir = join(process.cwd(), 'data');
     const db = await initDatabase(':memory:', dataDir);
-    setDatabase(db);
+    setQueryDatabase(db);
+    setChatDatabase(db);
     console.log('✓ DuckDB initialized with spatial extension');
 
     // Note: Data loading will happen when data files are available
