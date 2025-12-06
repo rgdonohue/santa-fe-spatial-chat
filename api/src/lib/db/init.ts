@@ -1,10 +1,12 @@
 import { Database, Connection, DuckDbError } from 'duckdb';
 import { join } from 'path';
+import { existsSync, readdirSync } from 'fs';
 import type { LayerName } from '../../../../shared/types/geo';
+import { LAYER_SCHEMAS } from '../../../../shared/types/geo';
 
 /**
  * Initialize DuckDB database with spatial extension and load layers
- * 
+ *
  * @param dbPath - Path to DuckDB database file (use ':memory:' for in-memory)
  * @param dataDir - Directory containing GeoParquet files
  * @returns Initialized DuckDB database instance
@@ -36,12 +38,100 @@ export async function initDatabase(
             return;
           }
 
-          // Load layers (will be called after data files exist)
-          // For now, just resolve with the database
-          // Layers will be loaded when data files are available
-          resolve(db);
+          // Auto-load all available parquet files
+          loadAllLayers(conn, dataDir)
+            .then(() => resolve(db))
+            .catch((loadErr) => {
+              console.warn('Warning: Some layers failed to load:', loadErr);
+              // Still resolve - partial data is better than none
+              resolve(db);
+            });
         });
       });
+    });
+  });
+}
+
+/**
+ * Auto-load all parquet files from data directory
+ */
+async function loadAllLayers(
+  conn: Connection,
+  dataDir: string
+): Promise<void> {
+  if (!existsSync(dataDir)) {
+    console.log('Data directory does not exist:', dataDir);
+    return;
+  }
+
+  // Find all .parquet files
+  const files = readdirSync(dataDir).filter((f) => f.endsWith('.parquet'));
+
+  if (files.length === 0) {
+    console.log('No parquet files found in:', dataDir);
+    return;
+  }
+
+  console.log(`Found ${files.length} parquet files to load`);
+
+  for (const file of files) {
+    const layerName = file.replace('.parquet', '');
+    const filePath = join(dataDir, file);
+
+    // Check if this is a known layer
+    if (!(layerName in LAYER_SCHEMAS)) {
+      console.warn(`  Skipping unknown layer: ${layerName}`);
+      continue;
+    }
+
+    try {
+      await loadParquetLayer(conn, layerName as LayerName, filePath);
+      console.log(`  ✓ Loaded: ${layerName}`);
+    } catch (err) {
+      console.error(`  ✗ Failed to load ${layerName}:`, err);
+    }
+  }
+}
+
+/**
+ * Load a parquet file and create dual geometry columns
+ * The parquet files have geometry stored as GEOMETRY type (via ST_Read export).
+ */
+async function loadParquetLayer(
+  conn: Connection,
+  layerName: LayerName,
+  parquetPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // The parquet files have geometry column - create dual CRS columns
+    const sql = `
+      CREATE TABLE "${layerName}" AS
+      SELECT
+        * EXCLUDE (geometry),
+        geometry AS geom_4326,
+        ST_Transform(geometry, 'EPSG:4326', 'EPSG:32613') AS geom_utm13
+      FROM read_parquet('${parquetPath}');
+    `;
+
+    conn.exec(sql, (err: DuckDbError | null) => {
+      if (err) {
+        reject(new Error(`Failed to load ${layerName}: ${err.message}`));
+        return;
+      }
+
+      // Get row count
+      conn.all(
+        `SELECT COUNT(*) as count FROM "${layerName}"`,
+        (countErr: DuckDbError | null, rows: unknown[]) => {
+          if (countErr) {
+            resolve(); // Still consider it loaded
+            return;
+          }
+          const count = (rows[0] as { count: number }).count;
+          console.log(`    ${count} features`);
+          resolve();
+        }
+      );
     });
   });
 }

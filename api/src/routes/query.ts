@@ -22,6 +22,22 @@ export function setDatabase(db: Database): void {
 }
 
 /**
+ * Convert BigInt values to numbers for JSON serialization
+ */
+function convertBigInts(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'bigint') {
+      // Convert to number if it fits, otherwise string
+      result[key] = Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * Convert database row to GeoJSON feature
  */
 function rowToFeature(row: Record<string, unknown>): GeoJSON.Feature {
@@ -40,7 +56,7 @@ function rowToFeature(row: Record<string, unknown>): GeoJSON.Feature {
   return {
     type: 'Feature',
     geometry: geom,
-    properties: properties as Record<string, unknown>,
+    properties: convertBigInts(properties),
   };
 }
 
