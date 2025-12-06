@@ -18,8 +18,8 @@
 import { Database, Connection, DuckDbError } from 'duckdb';
 import { join, dirname, basename, extname } from 'path';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import type { LayerName, LayerSchema } from '../shared/types/geo';
-import { LAYER_SCHEMAS } from '../shared/types/geo';
+import type { LayerName, LayerSchema } from '../../shared/types/geo';
+import { LAYER_SCHEMAS } from '../../shared/types/geo';
 
 interface LayerManifest {
   name: string;
@@ -154,14 +154,15 @@ async function processLayer(
         )?.column_name || 'geometry';
 
         // Get feature count and extent
+        // Calculate min/max from individual geometries
         conn.all(
           `
           SELECT 
             COUNT(*) as count,
-            ST_XMin(ST_Extent(${geometryCol})) as minX,
-            ST_YMin(ST_Extent(${geometryCol})) as minY,
-            ST_XMax(ST_Extent(${geometryCol})) as maxX,
-            ST_YMax(ST_Extent(${geometryCol})) as maxY
+            MIN(ST_XMin(${geometryCol})) as minX,
+            MIN(ST_YMin(${geometryCol})) as minY,
+            MAX(ST_XMax(${geometryCol})) as maxX,
+            MAX(ST_YMax(${geometryCol})) as maxY
           FROM ${tempTable}
           `,
           (err: DuckDbError | null, rows: unknown[]) => {
@@ -193,12 +194,13 @@ async function processLayer(
             }
 
             // Create table with dual geometries
+            // DuckDB ST_Transform requires EPSG codes as strings
             const createTableSql = `
               CREATE TABLE ${layerName} AS 
               SELECT
                 * EXCLUDE (${geometryCol}),
-                ST_Transform(${geometryCol}, 4326) AS geom_4326,
-                ST_Transform(${geometryCol}, 32613) AS geom_utm13
+                ST_Transform(${geometryCol}, 'EPSG:${sourceSrid}', 'EPSG:4326') AS geom_4326,
+                ST_Transform(${geometryCol}, 'EPSG:${sourceSrid}', 'EPSG:32613') AS geom_utm13
               FROM ${tempTable};
             `;
 
@@ -317,7 +319,7 @@ async function main() {
   }
 
   // Setup paths
-  const outputDir = join(process.cwd(), 'api', 'data');
+  const outputDir = join(process.cwd(), 'data');
   const manifestPath = join(outputDir, 'manifest.json');
 
   // Ensure output directory exists
