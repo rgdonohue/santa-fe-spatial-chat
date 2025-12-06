@@ -11,7 +11,8 @@
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "test:parser": "tsx scripts/test-parser.ts"
   },
   "keywords": [],
   "author": "",
@@ -35,6 +36,7 @@
     "prettier": "^3.7.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.1",
     "vitest": "^4.0.15"
   }
 }
