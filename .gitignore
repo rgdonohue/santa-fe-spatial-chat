@@ -3,3 +3,11 @@ dist/
 .env
 .env.local
 *.log
+
+# Data files (large, generated)
+api/data/*.parquet
+api/data/raw/
+api/data/manifest.json
+
+# Keep data directory structure
+!api/data/.gitkeep
