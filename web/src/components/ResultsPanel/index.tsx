@@ -104,7 +104,7 @@ export function ResultsPanel({
               {features.slice(0, 100).map((feature, index) => (
                 <tr
                   key={index}
-                  className={selectedFeature === feature ? 'selected' : ''}
+                  className={featuresEqual(selectedFeature, feature) ? 'selected' : ''}
                   onClick={() => onFeatureSelect(feature)}
                 >
                   {displayKeys.map((key) => (
@@ -126,6 +126,39 @@ export function ResultsPanel({
       )}
     </div>
   );
+}
+
+/**
+ * Compare two features for equality by ID or properties
+ * Used to match selected features from map clicks with table rows
+ */
+function featuresEqual(
+  a: Feature<Geometry, Record<string, unknown>> | null,
+  b: Feature<Geometry, Record<string, unknown>> | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  // Compare by ID if both have IDs
+  if (a.id !== undefined && b.id !== undefined) {
+    return a.id === b.id;
+  }
+
+  // Fallback: compare by geometry and key properties
+  // This handles cases where features don't have IDs
+  const aProps = a.properties ?? {};
+  const bProps = b.properties ?? {};
+  
+  // Try to find a unique identifier in properties
+  const idKeys = ['id', 'OBJECTID', 'parcel_id', 'geoid', 'zone_id', 'listing_id', 'filing_id'];
+  for (const key of idKeys) {
+    if (aProps[key] !== undefined && bProps[key] !== undefined) {
+      return aProps[key] === bProps[key];
+    }
+  }
+
+  // Last resort: reference equality (will fail for map-clicked features)
+  return false;
 }
 
 /**
