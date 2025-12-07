@@ -144,12 +144,13 @@ function featuresEqual(
     return a.id === b.id;
   }
 
-  // Fallback: compare by geometry and key properties
-  // This handles cases where features don't have IDs
+  // Fallback: compare by unique identifier properties
+  // This handles cases where features don't have top-level IDs
   const aProps = a.properties ?? {};
   const bProps = b.properties ?? {};
   
   // Try to find a unique identifier in properties
+  // Common ID field names across different layer types
   const idKeys = ['id', 'OBJECTID', 'parcel_id', 'geoid', 'zone_id', 'listing_id', 'filing_id'];
   for (const key of idKeys) {
     if (aProps[key] !== undefined && bProps[key] !== undefined) {
@@ -157,7 +158,8 @@ function featuresEqual(
     }
   }
 
-  // Last resort: reference equality (will fail for map-clicked features)
+  // If no ID found, features are considered different
+  // This prevents false matches but means map-clicked features without IDs won't highlight
   return false;
 }
 
