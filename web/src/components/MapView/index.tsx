@@ -313,10 +313,11 @@ export function MapView({
 
 /**
  * Calculate bounding box for a set of features
+ * Returns bounds in MapLibre format: [[swLng, swLat], [neLng, neLat]]
  */
 function getBounds(
   features: Feature<Geometry, Record<string, unknown>>[]
-): [number, number, number, number] | null {
+): [[number, number], [number, number]] | null {
   let minLng = Infinity;
   let minLat = Infinity;
   let maxLng = -Infinity;
@@ -354,6 +355,7 @@ function getBounds(
 
   if (minLng === Infinity) return null;
 
-  return [minLng, minLat, maxLng, maxLat];
+  // Return in MapLibre format: [[southwest], [northeast]]
+  return [[minLng, minLat], [maxLng, maxLat]];
 }
 
