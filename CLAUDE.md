@@ -27,7 +27,7 @@ npm run lint         # ESLint
 
 ### Prerequisites
 - Node.js 20+
-- Ollama running locally with a model pulled (`ollama pull qwen2.5:7b` or `llama3.1:8b`)
+- Ollama running locally with a model pulled (`ollama pull qwen2.5:7b` or `ollama pull llama3.1:8b`)
 
 ## Architecture
 
