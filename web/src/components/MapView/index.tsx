@@ -117,15 +117,27 @@ export function MapView({
         },
       });
 
-      // Line layer for polygons and linestrings - darker stroke
+      // Line layer for polygon outlines - darker stroke
       m.addLayer({
         id: RESULTS_LINE_LAYER,
         type: 'line',
         source: RESULTS_SOURCE,
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'LineString']]],
+        filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
           'line-color': STROKE_COLOR,
           'line-width': 1,
+        },
+      });
+
+      // Line layer for LineString features (hydrology, etc.) - steelblue
+      m.addLayer({
+        id: 'query-results-linestring',
+        type: 'line',
+        source: RESULTS_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': FILL_COLOR,
+          'line-width': 2,
         },
       });
 
@@ -161,7 +173,7 @@ export function MapView({
       if (!m) return;
 
       const clickedFeatures = m.queryRenderedFeatures(e.point, {
-        layers: [RESULTS_FILL_LAYER, RESULTS_LINE_LAYER, RESULTS_POINT_LAYER],
+        layers: [RESULTS_FILL_LAYER, RESULTS_LINE_LAYER, 'query-results-linestring', RESULTS_POINT_LAYER],
       });
 
       if (clickedFeatures.length > 0) {
@@ -196,17 +208,20 @@ export function MapView({
       if (!props) return;
 
       // Build tooltip content with HTML escaping
-      const zoneCode = escapeHtml(String(props['ZDESC'] ?? props['zoning'] ?? props['zone_code'] ?? 'N/A'));
-      const zoneDesc = escapeHtml(String(props['DESC_'] ?? props['description'] ?? props['zone_name'] ?? ''));
-      const objectId = escapeHtml(String(props['OBJECTID'] ?? props['id'] ?? ''));
+      // Handle different feature types (zoning, hydrology, census, etc.)
+      const name = escapeHtml(String(props['name'] ?? props['zone_code'] ?? props['geoid'] ?? ''));
+      const description = escapeHtml(String(props['zone_name'] ?? props['type'] ?? props['name_full'] ?? ''));
+      const id = escapeHtml(String(props['id'] ?? ''));
 
       let html = '<div class="tooltip-content">';
-      if (objectId) {
-        html += `<div class="tooltip-row"><strong>ID:</strong> ${objectId}</div>`;
+      if (id) {
+        html += `<div class="tooltip-row"><strong>ID:</strong> ${id}</div>`;
       }
-      html += `<div class="tooltip-row"><strong>Zone:</strong> ${zoneCode}</div>`;
-      if (zoneDesc && zoneDesc !== zoneCode) {
-        html += `<div class="tooltip-row tooltip-desc">${zoneDesc}</div>`;
+      if (name) {
+        html += `<div class="tooltip-row"><strong>Name:</strong> ${name}</div>`;
+      }
+      if (description && description !== name) {
+        html += `<div class="tooltip-row tooltip-desc">${description}</div>`;
       }
       html += '</div>';
 
@@ -222,9 +237,11 @@ export function MapView({
 
     map.current.on('mousemove', RESULTS_FILL_LAYER, handleMouseMove);
     map.current.on('mousemove', RESULTS_LINE_LAYER, handleMouseMove);
+    map.current.on('mousemove', 'query-results-linestring', handleMouseMove);
     map.current.on('mousemove', RESULTS_POINT_LAYER, handleMouseMove);
     map.current.on('mouseleave', RESULTS_FILL_LAYER, handleMouseLeave);
     map.current.on('mouseleave', RESULTS_LINE_LAYER, handleMouseLeave);
+    map.current.on('mouseleave', 'query-results-linestring', handleMouseLeave);
     map.current.on('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
 
     return () => {
@@ -234,9 +251,11 @@ export function MapView({
         m.off('click', handleClick);
         m.off('mousemove', RESULTS_FILL_LAYER, handleMouseMove);
         m.off('mousemove', RESULTS_LINE_LAYER, handleMouseMove);
+        m.off('mousemove', 'query-results-linestring', handleMouseMove);
         m.off('mousemove', RESULTS_POINT_LAYER, handleMouseMove);
         m.off('mouseleave', RESULTS_FILL_LAYER, handleMouseLeave);
         m.off('mouseleave', RESULTS_LINE_LAYER, handleMouseLeave);
+        m.off('mouseleave', 'query-results-linestring', handleMouseLeave);
         m.off('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
       }
       popup.current?.remove();

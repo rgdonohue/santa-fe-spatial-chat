@@ -40,9 +40,11 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     OBJECTID: 'id',
   },
   hydrology: {
+    // Using arroyos.geojson which has better coverage
     STRNAME: 'name',
     STRTYP: 'type',
-    LENGTH: 'length_km',  // Note: LENGTH is in unknown units, may need conversion
+    LENGTH: 'length_km',
+    ARROYO2_ID: 'arroyo_id',
     OBJECTID: 'id',
   },
   census_tracts: {
@@ -704,7 +706,7 @@ function getAllLayerConfigs(): LayerConfig[] {
     },
     {
       name: 'hydrology' as LayerName,
-      inputPath: join(dataDir, 'city_hydrology', 'city_hydrology.geojson'),
+      inputPath: join(dataDir, 'arroyos', 'arroyos.geojson'),  // Better coverage than city_hydrology
       sourceSrid: 4326,
     },
     {
