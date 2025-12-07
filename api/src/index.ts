@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
+import { existsSync, readFileSync } from 'fs';
 import layers from './routes/layers';
 import queryRoute, { setDatabase as setQueryDatabase } from './routes/query';
-import chatRoute, { setDatabase as setChatDatabase } from './routes/chat';
+import chatRoute, { setDatabase as setChatDatabase, setAvailableLayers } from './routes/chat';
 import templatesRoute from './routes/templates';
 import { initDatabase } from './lib/db/init';
 import { join } from 'path';
@@ -42,8 +43,17 @@ async function startServer() {
     setChatDatabase(db);
     console.log('✓ DuckDB initialized with spatial extension');
 
-    // Note: Data loading will happen when data files are available
-    // For now, the database is ready but empty
+    // Read manifest to get available layers
+    const manifestPath = join(dataDir, 'manifest.json');
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+        const availableLayers = Object.keys(manifest.layers || {});
+        setAvailableLayers(availableLayers);
+      } catch (e) {
+        console.warn('Could not read manifest:', e);
+      }
+    }
 
     console.log(`Server is running on port ${port}`);
     serve({

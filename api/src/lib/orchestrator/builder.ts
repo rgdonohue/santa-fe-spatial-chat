@@ -58,9 +58,10 @@ export class QueryBuilder {
       );
     }
 
-    // LIMIT
-    const limit = this.query.limit ?? 100;
-    parts.push(`LIMIT ${limit}`);
+    // LIMIT - only apply if explicitly set (spatial queries often want all features)
+    if (this.query.limit !== undefined) {
+      parts.push(`LIMIT ${this.query.limit}`);
+    }
 
     return { sql: parts.join('\n'), params: this.params };
   }

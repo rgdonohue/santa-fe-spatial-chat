@@ -23,6 +23,7 @@ import {
 import type { Database } from 'duckdb';
 import type { ParseResult } from '../lib/orchestrator/parser';
 import type { FeatureCollection } from 'geojson';
+import type { StructuredQuery } from '../../../shared/types/query';
 
 // Store database instance (will be initialized on startup)
 let dbInstance: Database | null = null;
@@ -73,11 +74,80 @@ function rowToFeature(row: Record<string, unknown>): GeoJSON.Feature {
   };
 }
 
+/**
+ * Generate a human-readable explanation of the query results
+ */
+function generateExplanation(query: StructuredQuery, count: number): string {
+  const parts: string[] = [];
+
+  // Describe the layer
+  const layerNames: Record<string, string> = {
+    zoning_districts: 'zoning districts',
+    census_tracts: 'census tracts',
+    hydrology: 'water features (arroyos)',
+  };
+  const layerName = layerNames[query.selectLayer] || query.selectLayer;
+
+  // Build filter description
+  const filterParts: string[] = [];
+  if (query.attributeFilters && query.attributeFilters.length > 0) {
+    const opNames: Record<string, string> = {
+      eq: 'equal to',
+      neq: 'not equal to',
+      gt: 'greater than',
+      gte: 'at least',
+      lt: 'less than',
+      lte: 'at most',
+      like: 'matching',
+      in: 'in',
+    };
+
+    for (const filter of query.attributeFilters) {
+      const fieldName = filter.field.replace(/_/g, ' ');
+      const opName = opNames[filter.op] || filter.op;
+      filterParts.push(`${fieldName} ${opName} ${filter.value}`);
+    }
+  }
+
+  // Build spatial description
+  if (query.spatialFilters && query.spatialFilters.length > 0) {
+    for (const filter of query.spatialFilters) {
+      const targetName = layerNames[filter.targetLayer] || filter.targetLayer;
+      if (filter.op === 'within_distance') {
+        filterParts.push(`within ${filter.distance}m of ${targetName}`);
+      } else if (filter.op === 'intersects') {
+        filterParts.push(`intersecting ${targetName}`);
+      } else {
+        filterParts.push(`${filter.op} ${targetName}`);
+      }
+    }
+  }
+
+  // Compose explanation
+  if (filterParts.length > 0) {
+    const logic = query.attributeLogic === 'or' ? ' or ' : ' and ';
+    parts.push(`Found ${count} ${layerName} where ${filterParts.join(logic)}.`);
+  } else {
+    parts.push(`Found ${count} ${layerName}.`);
+  }
+
+  return parts.join(' ');
+}
+
 const chatRoute = new Hono();
 
 // Initialize LLM client (singleton)
 const llmClient = new OllamaClient();
 const parser = new IntentParser(llmClient);
+
+/**
+ * Set available layers for the parser
+ * This restricts queries to only layers that exist in the database
+ */
+export function setAvailableLayers(layers: string[]): void {
+  parser.setAvailableLayers(layers);
+  console.log(`  Parser configured with layers: ${layers.join(', ')}`);
+}
 
 /**
  * POST /api/chat
@@ -187,9 +257,8 @@ chatRoute.post('/', async (c) => {
       queryCache.set(queryKey, { result, executionTimeMs });
     }
 
-    // 4. Generate simple explanation (for now, just return metadata)
-    // TODO: Add ResultExplainer in Week 6
-    const explanation = `Found ${result.features.length} result${result.features.length !== 1 ? 's' : ''} for your query.`;
+    // 4. Generate explanation based on query structure
+    const explanation = generateExplanation(structuredQuery, result.features.length);
 
     return c.json({
       query: structuredQuery,
@@ -208,10 +277,33 @@ chatRoute.post('/', async (c) => {
     });
   } catch (error) {
     if (error instanceof Error) {
+      const message = error.message;
+
+      // Check for missing table error
+      if (message.includes('Table with name') && message.includes('does not exist')) {
+        const tableMatch = message.match(/Table with name (\w+) does not exist/);
+        const missingTable = tableMatch?.[1] || 'unknown';
+        const availableLayers = parser.getAvailableLayers();
+
+        return c.json(
+          {
+            error: 'Data not available',
+            message: `The "${missingTable}" data layer is not currently loaded.`,
+            availableLayers,
+            suggestions: [
+              `Currently available: ${availableLayers.join(', ')}`,
+              'Try asking about zoning districts, census tracts, or hydrology',
+              'Example: "Show census tracts with high renter percentage"',
+            ],
+          },
+          400
+        );
+      }
+
       return c.json(
         {
           error: 'Query execution failed',
-          message: error.message,
+          message,
         },
         500
       );

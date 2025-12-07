@@ -21,7 +21,8 @@ export class ApiClientError extends Error {
   constructor(
     message: string,
     public statusCode: number,
-    public details?: string
+    public details?: string,
+    public suggestions?: string[]
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -49,17 +50,20 @@ async function apiFetch<T>(
     if (!response.ok) {
       let errorMessage = `API error: ${response.status}`;
       let details: string | undefined;
+      let suggestions: string[] | undefined;
 
       try {
         const errorBody = (await response.json()) as Record<string, unknown>;
         errorMessage = (errorBody.error as string) ?? errorMessage;
         // API returns 'message' field with more details
         details = (errorBody.message as string) ?? (errorBody.details as string);
+        // API may return suggestions for how to fix the query
+        suggestions = errorBody.suggestions as string[] | undefined;
       } catch {
         // Ignore JSON parse errors for error response
       }
 
-      throw new ApiClientError(errorMessage, response.status, details);
+      throw new ApiClientError(errorMessage, response.status, details, suggestions);
     }
 
     return (await response.json()) as T;

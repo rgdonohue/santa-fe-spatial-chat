@@ -57,20 +57,26 @@ function App() {
       setSelectedFeature(null);
     } catch (error) {
       let errorMessage = 'An unexpected error occurred';
+      let content = 'Sorry, I encountered an error processing your request.';
 
       if (error instanceof ApiClientError) {
         errorMessage = error.message;
         if (error.details) {
           errorMessage += `: ${error.details}`;
         }
+        // If we have suggestions, make the message more helpful
+        if (error.suggestions && error.suggestions.length > 0) {
+          content = `I couldn't complete that request. ${error.details || error.message}\n\nHere are some suggestions:\n• ${error.suggestions.join('\n• ')}`;
+          errorMessage = ''; // Don't show duplicate error
+        }
       }
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.',
+        content,
         timestamp: new Date(),
-        error: errorMessage,
+        error: errorMessage || undefined,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);

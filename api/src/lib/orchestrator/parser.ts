@@ -23,11 +23,28 @@ export interface ParseResult {
  * Intent parser that converts NL → StructuredQuery
  */
 export class IntentParser {
+  private availableLayers: Set<string> = new Set();
+
   constructor(private llm: LLMClient) {}
 
   /**
+   * Set which layers are actually available in the database
+   * This restricts the LLM to only suggest queries against loaded data
+   */
+  setAvailableLayers(layers: string[]): void {
+    this.availableLayers = new Set(layers);
+  }
+
+  /**
+   * Get list of available layers
+   */
+  getAvailableLayers(): string[] {
+    return Array.from(this.availableLayers);
+  }
+
+  /**
    * Parse a natural language query into a StructuredQuery
-   * 
+   *
    * @param userQuery - The user's natural language query
    * @returns ParseResult with query and confidence score
    * @throws Error if parsing fails completely
@@ -72,8 +89,13 @@ export class IntentParser {
    * Build the prompt with layer schemas and examples
    */
   private buildPrompt(userQuery: string): string {
+    // Filter to only available layers (if set), otherwise show all
+    const layersToShow = this.availableLayers.size > 0
+      ? Object.values(LAYER_SCHEMAS).filter((s) => this.availableLayers.has(s.name))
+      : Object.values(LAYER_SCHEMAS);
+
     // Build layer schema descriptions
-    const layerDescriptions = Object.values(LAYER_SCHEMAS)
+    const layerDescriptions = layersToShow
       .map((schema) => {
         const fields = Object.entries(schema.fields)
           .map(([name, type]) => `    - ${name}: ${type}`)
@@ -82,10 +104,24 @@ export class IntentParser {
       })
       .join('\n\n');
 
+    // Note about data availability
+    const availabilityNote = this.availableLayers.size > 0
+      ? `\nIMPORTANT: Only the layers listed above are currently available. You MUST only query these layers.
+If the user asks about data we don't have (like parcels, buildings, affordable housing, roads, etc.):
+- Still output a valid JSON query using the closest available alternative
+- For housing/property questions, use census_tracts (has income, rent data)
+- For land use questions, use zoning_districts
+- For water/drainage questions, use hydrology\n`
+      : '';
+
+    // Build examples that use available layers
+    const examples = this.buildExamples();
+
     return `You are a spatial query parser for Santa Fe, New Mexico. Convert natural language queries into structured JSON queries.
 
 Available layers:
 ${layerDescriptions}
+${availabilityNote}
 
 Supported operations:
 - Attribute filters: eq, neq, gt, gte, lt, lte, in, like
@@ -107,89 +143,7 @@ Output ONLY valid JSON matching this schema:
 }
 
 Examples:
-
-User: "Show residential parcels"
-{
-  "selectLayer": "parcels",
-  "attributeFilters": [
-    {"field": "zoning", "op": "in", "value": ["R-1", "R-2", "R-3", "R-4"]}
-  ]
-}
-
-User: "Parcels within 500 meters of the Santa Fe River"
-{
-  "selectLayer": "parcels",
-  "spatialFilters": [
-    {
-      "op": "within_distance",
-      "targetLayer": "hydrology",
-      "targetFilter": [{"field": "name", "op": "like", "value": "%Santa Fe River%"}],
-      "distance": 500
-    }
-  ]
-}
-
-User: "Census tracts with median income below 40000"
-{
-  "selectLayer": "census_tracts",
-  "attributeFilters": [
-    {"field": "median_income", "op": "lt", "value": 40000}
-  ]
-}
-
-User: "Vacant parcels near transit stops"
-{
-  "selectLayer": "parcels",
-  "spatialFilters": [
-    {
-      "op": "within_distance",
-      "targetLayer": "transit_access",
-      "distance": 500
-    }
-  ],
-  "attributeFilters": [
-    {"field": "land_use", "op": "like", "value": "%vacant%"}
-  ]
-}
-
-User: "Short-term rentals grouped by neighborhood"
-{
-  "selectLayer": "short_term_rentals",
-  "aggregate": {
-    "groupBy": ["property_type"],
-    "metrics": [{"field": "*", "op": "count", "alias": "str_count"}]
-  }
-}
-
-User: "Parcels within 500m of arroyos and inside flood zones"
-{
-  "selectLayer": "parcels",
-  "spatialFilters": [
-    {
-      "op": "within_distance",
-      "targetLayer": "hydrology",
-      "targetFilter": [{"field": "type", "op": "eq", "value": "arroyo"}],
-      "distance": 500
-    },
-    {
-      "op": "intersects",
-      "targetLayer": "flood_zones"
-    }
-  ],
-  "spatialLogic": "and"
-}
-
-User: "Affordable housing units near schools"
-{
-  "selectLayer": "affordable_housing_units",
-  "spatialFilters": [
-    {
-      "op": "within_distance",
-      "targetLayer": "school_zones",
-      "distance": 1000
-    }
-  ]
-}
+${examples}
 
 Now parse this query:
 User: "${userQuery}"
@@ -255,6 +209,124 @@ Output only the JSON object, no other text:`;
 
     // Ensure confidence is between 0 and 1
     return Math.max(0, Math.min(1, confidence));
+  }
+
+  /**
+   * Build examples based on available layers
+   * Uses only layers that are actually loaded
+   */
+  private buildExamples(): string {
+    const hasLayer = (name: string) =>
+      this.availableLayers.size === 0 || this.availableLayers.has(name);
+
+    const examples: string[] = [];
+
+    // Zoning examples
+    if (hasLayer('zoning_districts')) {
+      examples.push(`User: "Show all zoning districts"
+{
+  "selectLayer": "zoning_districts"
+}
+
+User: "Show R1 residential zones"
+{
+  "selectLayer": "zoning_districts",
+  "attributeFilters": [
+    {"field": "zone_code", "op": "like", "value": "R1%"}
+  ]
+}`);
+    }
+
+    // Census tract examples
+    if (hasLayer('census_tracts')) {
+      examples.push(`User: "Census tracts with median income below 50000"
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "median_income", "op": "lt", "value": 50000}
+  ]
+}
+
+User: "Show census tracts with high renter percentage"
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "pct_renter", "op": "gt", "value": 50}
+  ]
+}
+
+User: "Census tracts with population over 2000"
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "total_population", "op": "gt", "value": 2000}
+  ]
+}`);
+    }
+
+    // Hydrology examples
+    if (hasLayer('hydrology')) {
+      examples.push(`User: "Show the hydrology network"
+{
+  "selectLayer": "hydrology"
+}
+
+User: "Show all arroyos"
+{
+  "selectLayer": "hydrology"
+}`);
+    }
+
+    // Spatial query examples (only if both layers available)
+    if (hasLayer('zoning_districts') && hasLayer('hydrology')) {
+      examples.push(`User: "Zoning districts near arroyos"
+{
+  "selectLayer": "zoning_districts",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "hydrology",
+      "distance": 200
+    }
+  ]
+}`);
+    }
+
+    if (hasLayer('census_tracts') && hasLayer('zoning_districts')) {
+      examples.push(`User: "Census tracts that intersect commercial zoning"
+{
+  "selectLayer": "census_tracts",
+  "spatialFilters": [
+    {
+      "op": "intersects",
+      "targetLayer": "zoning_districts",
+      "targetFilter": [{"field": "zone_code", "op": "like", "value": "C%"}]
+    }
+  ]
+}`);
+    }
+
+    // Add fallback examples for unavailable data requests
+    if (hasLayer('census_tracts')) {
+      examples.push(`User: "Show affordable housing locations"
+(Note: affordable_housing layer not available, using census_tracts with income data as alternative)
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "median_income", "op": "lt", "value": 40000}
+  ]
+}
+
+User: "Where are the low income areas?"
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "median_income", "op": "lt", "value": 35000}
+  ]
+}`);
+    }
+
+    return examples.join('\n\n');
   }
 }
 
