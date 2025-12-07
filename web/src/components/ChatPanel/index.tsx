@@ -44,10 +44,9 @@ export function ChatPanel({
   };
 
   const exampleQueries = [
-    'Show all residential parcels',
-    'Census tracts with median income below $40,000',
-    'Parcels within 500m of the Santa Fe River',
-    'Which neighborhoods have the most short-term rentals?',
+    'Show all zoning districts',
+    'Show all census tracts',
+    'Show the hydrology network',
   ];
 
   return (

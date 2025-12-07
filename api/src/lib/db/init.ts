@@ -95,7 +95,8 @@ async function loadAllLayers(
 
 /**
  * Load a parquet file and create dual geometry columns
- * The parquet files have geometry stored as GEOMETRY type (via ST_Read export).
+ * The parquet files have geometry stored as WKB blob (via ST_AsWKB export in prepare-data).
+ * DuckDB may auto-detect as GEOMETRY type or as BLOB depending on how it was written.
  */
 async function loadParquetLayer(
   conn: Connection,
@@ -103,36 +104,62 @@ async function loadParquetLayer(
   parquetPath: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    // The parquet files have geometry column - create dual CRS columns
-    const sql = `
-      CREATE TABLE "${layerName}" AS
-      SELECT
-        * EXCLUDE (geometry),
-        geometry AS geom_4326,
-        ST_Transform(geometry, 'EPSG:4326', 'EPSG:32613') AS geom_utm13
-      FROM read_parquet('${parquetPath}');
-    `;
+    // First, check the geometry column type in the parquet file
+    conn.all(
+      `DESCRIBE SELECT * FROM read_parquet('${parquetPath}') LIMIT 1`,
+      (descErr: DuckDbError | null, descRows: unknown[]) => {
+        if (descErr) {
+          reject(new Error(`Failed to describe ${layerName}: ${descErr.message}`));
+          return;
+        }
 
-    conn.exec(sql, (err: DuckDbError | null) => {
-      if (err) {
-        reject(new Error(`Failed to load ${layerName}: ${err.message}`));
-        return;
-      }
+        // Find geometry column type
+        const geomRow = (descRows as Array<{ column_name: string; column_type: string }>).find(
+          (r) => r.column_name === 'geometry'
+        );
+        const geomType = geomRow?.column_type || 'UNKNOWN';
 
-      // Get row count
-      conn.all(
-        `SELECT COUNT(*) as count FROM "${layerName}"`,
-        (countErr: DuckDbError | null, rows: unknown[]) => {
-          if (countErr) {
-            resolve(); // Still consider it loaded
+        // Build appropriate SQL based on geometry type
+        let geomExpr: string;
+        if (geomType.includes('GEOMETRY')) {
+          // Already a geometry type, use directly
+          geomExpr = 'geometry';
+        } else {
+          // Assume BLOB/WKB, convert
+          geomExpr = 'ST_GeomFromWKB(geometry)';
+        }
+
+        const sql = `
+          CREATE TABLE "${layerName}" AS
+          SELECT
+            * EXCLUDE (geometry),
+            ${geomExpr} AS geom_4326,
+            ST_Transform(${geomExpr}, 'EPSG:4326', 'EPSG:32613') AS geom_utm13
+          FROM read_parquet('${parquetPath}');
+        `;
+
+        conn.exec(sql, (err: DuckDbError | null) => {
+          if (err) {
+            reject(new Error(`Failed to load ${layerName}: ${err.message}`));
             return;
           }
-          const count = (rows[0] as { count: number }).count;
-          console.log(`    ${count} features`);
-          resolve();
-        }
-      );
-    });
+
+          // Get row count
+          conn.all(
+            `SELECT COUNT(*) as count FROM "${layerName}"`,
+            (countErr: DuckDbError | null, rows: unknown[]) => {
+              if (countErr) {
+                resolve(); // Still consider it loaded
+                return;
+              }
+              const count = (rows[0] as { count: number }).count;
+              console.log(`    ${count} features`);
+              resolve();
+            }
+          );
+        });
+      }
+    );
   });
 }
 

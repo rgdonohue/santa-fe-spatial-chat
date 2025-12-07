@@ -12,7 +12,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:parser": "tsx scripts/test-parser.ts"
+    "test:parser": "tsx scripts/test-parser.ts",
+    "prepare-data": "tsx scripts/prepare-data.ts --all"
   },
   "keywords": [],
   "author": "",
