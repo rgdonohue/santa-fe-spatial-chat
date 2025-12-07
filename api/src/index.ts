@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import layers from './routes/layers';
 import queryRoute, { setDatabase as setQueryDatabase } from './routes/query';
@@ -8,6 +9,16 @@ import { initDatabase } from './lib/db/init';
 import { join } from 'path';
 
 const app = new Hono();
+
+// Enable CORS for development
+app.use(
+  '/api/*',
+  cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type'],
+  })
+);
 
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok' });

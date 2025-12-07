@@ -1,0 +1,120 @@
+/**
+ * API client for Santa Fe Spatial Chat
+ */
+
+import type {
+  ChatRequest,
+  ChatResponse,
+  QueryRequest,
+  LayersResponse,
+  ApiError,
+  QueryResult,
+  StructuredQuery,
+} from '../types/api';
+
+const API_BASE = 'http://localhost:3000';
+
+/**
+ * Custom error class for API errors
+ */
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public details?: string
+  ) {
+    super(message);
+    this.name = 'ApiClientError';
+  }
+}
+
+/**
+ * Generic fetch wrapper with error handling
+ */
+async function apiFetch<T>(
+  endpoint: string,
+  options?: RequestInit
+): Promise<T> {
+  const url = `${API_BASE}${endpoint}`;
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = `API error: ${response.status}`;
+      let details: string | undefined;
+
+      try {
+        const errorBody = (await response.json()) as Record<string, unknown>;
+        errorMessage = (errorBody.error as string) ?? errorMessage;
+        // API returns 'message' field with more details
+        details = (errorBody.message as string) ?? (errorBody.details as string);
+      } catch {
+        // Ignore JSON parse errors for error response
+      }
+
+      throw new ApiClientError(errorMessage, response.status, details);
+    }
+
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof ApiClientError) {
+      throw error;
+    }
+
+    // Network or other errors
+    throw new ApiClientError(
+      error instanceof Error ? error.message : 'Unknown error',
+      0
+    );
+  }
+}
+
+/**
+ * Send a natural language chat message
+ */
+export async function sendChatMessage(
+  message: string,
+  conversationId?: string
+): Promise<ChatResponse> {
+  const request: ChatRequest = { message, conversationId };
+
+  return apiFetch<ChatResponse>('/api/chat', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+/**
+ * Execute a structured query directly
+ */
+export async function executeQuery(
+  query: StructuredQuery
+): Promise<QueryResult> {
+  const request: QueryRequest = { query };
+
+  return apiFetch<QueryResult>('/api/query', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+/**
+ * Get available layers and their schemas
+ */
+export async function getLayers(): Promise<LayersResponse> {
+  return apiFetch<LayersResponse>('/api/layers');
+}
+
+/**
+ * Check API health
+ */
+export async function checkHealth(): Promise<{ status: string }> {
+  return apiFetch<{ status: string }>('/api/health');
+}
