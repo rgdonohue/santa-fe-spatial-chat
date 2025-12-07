@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Feature, Geometry } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -17,40 +17,33 @@ const RESULTS_POINT_LAYER = 'query-results-point';
 const SELECTED_SOURCE = 'selected-feature';
 const SELECTED_LAYER = 'selected-feature-layer';
 
-// Color palette for categorical data (zoning types, etc.)
-const CATEGORY_COLORS: Record<string, string> = {
-  // Residential zones
-  'R1': '#2ecc71',      // Green
-  'R-1': '#2ecc71',
-  'R2': '#27ae60',
-  'R-2': '#27ae60',
-  'R3': '#1e8449',
-  'R-3': '#1e8449',
-  // Commercial zones
-  'C1': '#3498db',      // Blue
-  'C-1': '#3498db',
-  'C2': '#2980b9',
-  'C-2': '#2980b9',
-  'C3': '#1f618d',
-  'C-3': '#1f618d',
-  // Industrial zones
-  'I1': '#9b59b6',      // Purple
-  'I-1': '#9b59b6',
-  'I2': '#8e44ad',
-  'I-2': '#8e44ad',
-  // Mixed use
-  'MU': '#e67e22',      // Orange
-  'M-U': '#e67e22',
-  'MXD': '#e67e22',
-  // Special districts
-  'PD': '#e74c3c',      // Red
-  'P-D': '#e74c3c',
-  'PRRC': '#c0392b',    // Dark red (Planned Resort-Residential)
-  'SC': '#f39c12',      // Yellow (Special Commercial)
-  'S-C': '#f39c12',
-  // Default
-  'default': '#95a5a6', // Gray
-};
+// Steelblue color for all features
+const FILL_COLOR = '#4682b4';
+const STROKE_COLOR = '#2c5270';
+
+/**
+ * Escape HTML entities to prevent XSS attacks
+ */
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Convert a MapLibre feature to a plain GeoJSON feature
+ * MapLibre features have non-serializable geometry objects
+ */
+function toPlainFeature(
+  feature: maplibregl.MapGeoJSONFeature
+): Feature<Geometry, Record<string, unknown>> {
+  return {
+    type: 'Feature',
+    geometry: feature.geometry as Geometry,
+    properties: { ...feature.properties },
+    id: feature.id,
+  };
+}
 
 export function MapView({
   features,
@@ -60,20 +53,6 @@ export function MapView({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
-
-  // Build color expression for fill layer based on zoning code
-  const fillColorExpression = useMemo(() => {
-    const expression: unknown[] = ['match', ['get', 'ZDESC']];
-
-    for (const [code, color] of Object.entries(CATEGORY_COLORS)) {
-      if (code !== 'default') {
-        expression.push(code, color);
-      }
-    }
-    expression.push(CATEGORY_COLORS['default']); // fallback
-
-    return expression;
-  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -126,15 +105,15 @@ export function MapView({
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Fill layer for polygons - uses zoning-based coloring
+      // Fill layer for polygons - steelblue
       m.addLayer({
         id: RESULTS_FILL_LAYER,
         type: 'fill',
         source: RESULTS_SOURCE,
         filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
-          'fill-color': fillColorExpression as maplibregl.ExpressionSpecification,
-          'fill-opacity': 0.5,
+          'fill-color': FILL_COLOR,
+          'fill-opacity': 0.4,
         },
       });
 
@@ -145,8 +124,8 @@ export function MapView({
         source: RESULTS_SOURCE,
         filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'LineString']]],
         paint: {
-          'line-color': '#2c3e50',
-          'line-width': 1.5,
+          'line-color': STROKE_COLOR,
+          'line-width': 1,
         },
       });
 
@@ -158,7 +137,7 @@ export function MapView({
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
           'circle-radius': 6,
-          'circle-color': '#6366f1',
+          'circle-color': FILL_COLOR,
           'circle-stroke-color': '#fff',
           'circle-stroke-width': 2,
         },
@@ -188,7 +167,8 @@ export function MapView({
       if (clickedFeatures.length > 0) {
         const feature = clickedFeatures[0];
         if (feature) {
-          onFeatureClick(feature as Feature<Geometry, Record<string, unknown>>);
+          // Convert to plain GeoJSON to avoid serialization issues
+          onFeatureClick(toPlainFeature(feature));
         }
       }
     };
@@ -215,10 +195,10 @@ export function MapView({
       const props = feature.properties;
       if (!props) return;
 
-      // Build tooltip content
-      const zoneCode = props['ZDESC'] ?? props['zoning'] ?? props['zone_code'] ?? 'N/A';
-      const zoneDesc = props['DESC_'] ?? props['description'] ?? props['zone_name'] ?? '';
-      const objectId = props['OBJECTID'] ?? props['id'] ?? '';
+      // Build tooltip content with HTML escaping
+      const zoneCode = escapeHtml(String(props['ZDESC'] ?? props['zoning'] ?? props['zone_code'] ?? 'N/A'));
+      const zoneDesc = escapeHtml(String(props['DESC_'] ?? props['description'] ?? props['zone_name'] ?? ''));
+      const objectId = escapeHtml(String(props['OBJECTID'] ?? props['id'] ?? ''));
 
       let html = '<div class="tooltip-content">';
       if (objectId) {
@@ -248,13 +228,24 @@ export function MapView({
     map.current.on('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
 
     return () => {
+      // Remove all event listeners before cleanup
+      const m = map.current;
+      if (m) {
+        m.off('click', handleClick);
+        m.off('mousemove', RESULTS_FILL_LAYER, handleMouseMove);
+        m.off('mousemove', RESULTS_LINE_LAYER, handleMouseMove);
+        m.off('mousemove', RESULTS_POINT_LAYER, handleMouseMove);
+        m.off('mouseleave', RESULTS_FILL_LAYER, handleMouseLeave);
+        m.off('mouseleave', RESULTS_LINE_LAYER, handleMouseLeave);
+        m.off('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
+      }
       popup.current?.remove();
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
     };
-  }, [onFeatureClick, fillColorExpression]);
+  }, [onFeatureClick]);
 
   // Update results layer when features change
   useEffect(() => {
