@@ -85,6 +85,7 @@ function generateExplanation(query: StructuredQuery, count: number): string {
     parcels: 'parcels',
     building_footprints: 'buildings',
     short_term_rentals: 'short-term rentals',
+    transit_access: 'transit stops',
     zoning_districts: 'zoning districts',
     census_tracts: 'census tracts',
     hydrology: 'water features (arroyos)',
@@ -154,6 +155,10 @@ function generateDynamicSuggestions(availableLayers: string[]): string[] {
   if (availableLayers.includes('short_term_rentals')) {
     suggestions.push('Try: "Show short-term rentals"');
     suggestions.push('Try: "STR permits issued in 2024"');
+  }
+  if (availableLayers.includes('transit_access')) {
+    suggestions.push('Try: "Show transit stops"');
+    suggestions.push('Try: "Transit stops near affordable housing"');
   }
   if (availableLayers.includes('census_tracts')) {
     suggestions.push('Try: "Show census tracts by income"');

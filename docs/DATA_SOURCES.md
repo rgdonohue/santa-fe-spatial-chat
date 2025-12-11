@@ -20,7 +20,7 @@ Document each dataset used in the project, its provenance, update cadence, known
 | affordable_housing_units | City/County Housing Dept | Quarterly? | WGS84/UTM13 (converted) | TBD | Track deed restrictions and expiry dates |
 | vacancy_status | Assessor + USPS vacancy | Annual? | WGS84/UTM13 (converted) | TBD | Distinguish seasonal vs long-term vacancy |
 | eviction_filings | NM court records (geocoded) | Monthly? | WGS84/UTM13 (converted) | TBD | Address parsing quality; privacy considerations |
-| transit_access | City transit GTFS | As published | WGS84/UTM13 (converted) | Open transit data | Include stops/routes/headways if available |
+| transit_access | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | Bus stops from Santa Fe Trails. Max 2000 records per request (pagination handled) |
 | school_zones | School district GIS | Annual? | WGS84/UTM13 (converted) | TBD | Verify grade coverage and overlaps |
 | historic_districts | City GIS | Annual? | WGS84/UTM13 (converted) | TBD | Note restrictions affecting development |
 | flood_zones | FEMA NFHL | As published | WGS84/UTM13 (converted) | FEMA terms | Check for latest revisions |

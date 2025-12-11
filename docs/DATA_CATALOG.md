@@ -1,24 +1,25 @@
 # Santa Fe Spatial Chat — Data Catalog
 
 **Last Updated:** December 11, 2025  
-**Status:** 6 of 14 layers loaded (43%)
+**Status:** 7 of 14 layers loaded (50%)
 
 This catalog consolidates data provenance from `DATA_SOURCES.md` with live statistics from `api/data/manifest.json`. For detailed source information, licensing, and update cadences, see [DATA_SOURCES.md](./DATA_SOURCES.md).
 
 ---
 
-## Loaded Layers (6)
+## Loaded Layers (7)
 
 | Layer | Features | Size | Geometry | Status | Source | Last Updated |
 |-------|----------|------|-----------|--------|--------|--------------|
 | **parcels** | 63,439 | 30MB | Polygon | ✅ Loaded | City ArcGIS REST | 2025-12-11 |
 | **building_footprints** | 42,630 | 6.9MB | Polygon | ✅ Loaded | City ArcGIS REST | 2025-12-11 |
 | **short_term_rentals** | 897 | 47KB | Point | ✅ Loaded | City ArcGIS REST | 2025-12-11 |
+| **transit_access** | 447 | 28KB | Point | ✅ Loaded | City ArcGIS REST | 2025-12-11 |
 | **census_tracts** | 57 | 483KB | Polygon | ✅ Loaded | US Census ACS | 2025-12-07 |
 | **zoning_districts** | 851 | 587KB | Polygon | ✅ Loaded | City GIS | 2025-12-07 |
 | **hydrology** | 109 | 219KB | LineString | ✅ Loaded | City/County GIS | 2025-12-07 |
 
-**Total:** 107,983 features, ~38MB compressed
+**Total:** 108,430 features, ~38MB compressed
 
 ---
 
@@ -60,6 +61,13 @@ This catalog consolidates data provenance from `DATA_SOURCES.md` with live stati
 - **Extent:** City limits
 - **Notes:** STR permit data (not Airbnb/VRBO scraping)
 
+### ✅ transit_access
+- **Source:** City of Santa Fe GIS ArcGIS REST Service (Layer 67)
+- **Fetch Script:** `scripts/fetch-transit.ts`
+- **Fields:** stop_id, stop_name, route_ids, route_names, stop_type, wheelchair_accessible
+- **Extent:** City limits
+- **Notes:** Bus stops from Santa Fe Trails transit system
+
 ### ✅ census_tracts
 - **Source:** US Census Bureau TIGER/Line + ACS 5-year estimates
 - **Fetch Script:** `scripts/fetch-public-data.ts`
@@ -100,12 +108,12 @@ All loaded layers include:
 - ✅ parcels — `scripts/fetch-parcels.ts`
 - ✅ building_footprints — `scripts/fetch-buildings.ts`
 - ✅ short_term_rentals — `scripts/fetch-str-permits.ts`
+- ✅ transit_access — `scripts/fetch-transit.ts`
 - ✅ census_tracts — `scripts/fetch-public-data.ts`
 - ✅ zoning_districts — `scripts/fetch-public-data.ts`
 - ✅ hydrology — `scripts/fetch-public-data.ts`
 
 ### Manual Acquisition Required
-- ⏳ transit_access — Need to locate Santa Fe Trails GTFS endpoint
 - ⏳ affordable_housing_units — Contact City/County Housing Dept
 - ⏳ vacancy_status — Combine assessor + USPS data
 - ⏳ eviction_filings — Court records (privacy considerations)
@@ -118,12 +126,7 @@ All loaded layers include:
 
 ## Next Steps
 
-1. **Transit Data** (High Priority)
-   - Locate Santa Fe Trails GTFS feed
-   - Create `scripts/fetch-transit.ts`
-   - Process stops and routes
-
-2. **Affordable Housing** (High Priority)
+1. **Affordable Housing** (High Priority)
    - Contact City/County Housing Dept
    - Request deed-restricted unit locations
    - May require manual compilation
@@ -146,7 +149,7 @@ All loaded layers include:
 
 ## Quick Reference
 
-**Total Features:** 107,983  
+**Total Features:** 108,430  
 **Total Size:** ~38MB (compressed)  
 **Data Format:** GeoParquet  
 **Database:** DuckDB with spatial extension  

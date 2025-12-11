@@ -402,6 +402,34 @@ User: "Show all arroyos"
 }`);
     }
 
+    // Transit examples
+    if (hasLayer('transit_access')) {
+      examples.push(`User: "Show all transit stops"
+{
+  "selectLayer": "transit_access"
+}
+
+User: "Transit stops within 500 meters of affordable housing"
+{
+  "selectLayer": "transit_access",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "affordable_housing_units",
+      "distance": 500
+    }
+  ]
+}
+
+User: "Show wheelchair accessible stops"
+{
+  "selectLayer": "transit_access",
+  "attributeFilters": [
+    {"field": "wheelchair_accessible", "op": "eq", "value": true}
+  ]
+}`);
+    }
+
     // Short-term rental examples
     if (hasLayer('short_term_rentals')) {
       examples.push(`User: "Show all short-term rentals"
