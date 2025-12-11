@@ -82,6 +82,9 @@ function generateExplanation(query: StructuredQuery, count: number): string {
 
   // Describe the layer
   const layerNames: Record<string, string> = {
+    parcels: 'parcels',
+    building_footprints: 'buildings',
+    short_term_rentals: 'short-term rentals',
     zoning_districts: 'zoning districts',
     census_tracts: 'census tracts',
     hydrology: 'water features (arroyos)',
@@ -132,6 +135,43 @@ function generateExplanation(query: StructuredQuery, count: number): string {
   }
 
   return parts.join(' ');
+}
+
+/**
+ * Generate dynamic error suggestions based on available layers
+ */
+function generateDynamicSuggestions(availableLayers: string[]): string[] {
+  const suggestions: string[] = [];
+
+  if (availableLayers.includes('parcels')) {
+    suggestions.push('Try: "Show residential parcels"');
+    suggestions.push('Try: "Parcels with assessed value over $500,000"');
+  }
+  if (availableLayers.includes('building_footprints')) {
+    suggestions.push('Try: "Show buildings taller than 30 feet"');
+    suggestions.push('Try: "Buildings built after 2020"');
+  }
+  if (availableLayers.includes('short_term_rentals')) {
+    suggestions.push('Try: "Show short-term rentals"');
+    suggestions.push('Try: "STR permits issued in 2024"');
+  }
+  if (availableLayers.includes('census_tracts')) {
+    suggestions.push('Try: "Show census tracts by income"');
+    suggestions.push('Try: "Census tracts with low income"');
+  }
+  if (availableLayers.includes('zoning_districts')) {
+    suggestions.push('Try: "Show residential zones"');
+  }
+  if (availableLayers.includes('hydrology')) {
+    suggestions.push('Try: "Show the hydrology network"');
+  }
+
+  // Fallback if no layers loaded
+  if (suggestions.length === 0) {
+    suggestions.push('No data layers currently loaded');
+  }
+
+  return suggestions.slice(0, 3); // Max 3 suggestions
 }
 
 const chatRoute = new Hono();
@@ -207,15 +247,15 @@ chatRoute.post('/', async (c) => {
         );
       }
 
+        // Generate dynamic suggestions based on available layers
+        const availableLayers = parser.getAvailableLayers();
+        const suggestions = generateDynamicSuggestions(availableLayers);
+
         return c.json(
           {
             error: 'Could not understand query',
             message: errorMessage,
-            suggestions: [
-              'Try: "Show residential parcels"',
-              'Try: "Parcels near the river"',
-              'Try: "Census tracts with low income"',
-            ],
+            suggestions,
           },
           400
         );
@@ -292,8 +332,8 @@ chatRoute.post('/', async (c) => {
             availableLayers,
             suggestions: [
               `Currently available: ${availableLayers.join(', ')}`,
-              'Try asking about zoning districts, census tracts, or hydrology',
-              'Example: "Show census tracts with high renter percentage"',
+              'Try asking about parcels, buildings, zoning districts, census tracts, or hydrology',
+              'Example: "Show residential parcels" or "Show census tracts with high renter percentage"',
             ],
           },
           400

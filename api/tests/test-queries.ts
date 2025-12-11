@@ -6,6 +6,11 @@
  */
 
 export const TEST_QUERIES = [
+  // Simple layer queries (no filters)
+  'Show all census tracts',
+  'Show census tracts by income',
+  'Show residential zones',
+
   // Simple attribute queries
   'Show all parcels',
   'Show residential parcels',

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Feature, Geometry } from 'geojson';
+import type { ChoroplethConfig } from '../../lib/choropleth';
+import { buildFillColorExpression } from '../../lib/choropleth';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './MapView.css';
 
@@ -8,6 +10,7 @@ interface MapViewProps {
   features: Feature<Geometry, Record<string, unknown>>[];
   selectedFeature: Feature<Geometry, Record<string, unknown>> | null;
   onFeatureClick: (feature: Feature<Geometry, Record<string, unknown>>) => void;
+  choroplethConfig?: ChoroplethConfig | null;
 }
 
 const RESULTS_SOURCE = 'query-results';
@@ -49,6 +52,7 @@ export function MapView({
   features,
   selectedFeature,
   onFeatureClick,
+  choroplethConfig,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -323,9 +327,55 @@ export function MapView({
     }
   }, [selectedFeature]);
 
+  // Update choropleth styling when config or features change
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+
+    const updateChoropleth = () => {
+      const layer = m.getLayer(RESULTS_FILL_LAYER);
+      if (!layer) return;
+
+      if (choroplethConfig) {
+        // Apply data-driven color based on attribute values
+        const colorExpr = buildFillColorExpression(choroplethConfig);
+        console.log('Applying choropleth:', choroplethConfig.field, colorExpr);
+        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', colorExpr as maplibregl.ExpressionSpecification);
+        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.7);
+      } else {
+        // Reset to default steelblue
+        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', FILL_COLOR);
+        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.4);
+      }
+    };
+
+    // Small delay to ensure features are loaded first
+    if (m.isStyleLoaded()) {
+      setTimeout(updateChoropleth, 100);
+    } else {
+      m.once('load', () => setTimeout(updateChoropleth, 100));
+    }
+  }, [choroplethConfig, features]);
+
   return (
     <div className="map-view">
       <div ref={mapContainer} className="map-container" />
+      {choroplethConfig && (
+        <div className="map-legend">
+          <div className="legend-title">{choroplethConfig.label}</div>
+          <div className="legend-scale">
+            {choroplethConfig.colorRamp.map((color, i) => {
+              const label = choroplethConfig.classLabels[i] || '';
+              return (
+                <div key={i} className="legend-item">
+                  <span className="legend-color" style={{ backgroundColor: color }} />
+                  <span className="legend-label">{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

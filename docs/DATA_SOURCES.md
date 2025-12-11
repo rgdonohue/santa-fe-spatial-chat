@@ -6,7 +6,8 @@ Document each dataset used in the project, its provenance, update cadence, known
 
 | Layer | Source | Update Cadence | CRS | License/Attribution | Notes/Limitations |
 |-------|--------|----------------|-----|---------------------|-------------------|
-| parcels | Santa Fe County Assessor | Annual? | WGS84/UTM13 (converted) | TBD | Check for missing/invalid geometries; confirm SRID |
+| parcels | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | City limits only; County parcels require separate source. Max 2000 records per request (pagination handled) |
+| building_footprints | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | Building polygons with height, type, and year built. Max 2000 records per request (pagination handled) |
 | census_tracts | US Census ACS | Annual (ACS 1/5-year) | WGS84/UTM13 (converted) | Public domain (US Gov) | Include income, housing stock metrics |
 | hydrology | City/County GIS | TBD | WGS84/UTM13 (converted) | TBD | Verify naming for rivers/arroyos |
 | zoning_districts | City of Santa Fe GIS | TBD | WGS84/UTM13 (converted) | TBD | Map zone codes to readable names |
@@ -15,7 +16,7 @@ Document each dataset used in the project, its provenance, update cadence, known
 
 | Layer | Source | Update Cadence | CRS | License/Attribution | Notes/Limitations |
 |-------|--------|----------------|-----|---------------------|-------------------|
-| short_term_rentals | Airbnb/InsideAirbnb/Scrape | Monthly? | WGS84/UTM13 (converted) | TBD | Sampling bias; geocode accuracy |
+| short_term_rentals | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | STR permit data with addresses and permit dates. Max 2000 records per request (pagination handled) |
 | affordable_housing_units | City/County Housing Dept | Quarterly? | WGS84/UTM13 (converted) | TBD | Track deed restrictions and expiry dates |
 | vacancy_status | Assessor + USPS vacancy | Annual? | WGS84/UTM13 (converted) | TBD | Distinguish seasonal vs long-term vacancy |
 | eviction_filings | NM court records (geocoded) | Monthly? | WGS84/UTM13 (converted) | TBD | Address parsing quality; privacy considerations |

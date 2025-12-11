@@ -130,56 +130,74 @@ const DATA_SOURCES: Record<string, DataSource> = {
     automated: true,
   },
 
+  buildings: {
+    name: 'Building Footprints',
+    description: 'Building footprints from City of Santa Fe GIS',
+    url: 'https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer/3/query?where=1%3D1&outFields=*&f=geojson',
+    format: 'geojson',
+    automated: true,
+  },
+
   // ============================================================================
   // MANUAL DOWNLOADS - Require account or request
   // ============================================================================
 
   parcels: {
     name: 'County Parcels',
-    description: 'Property parcels from Santa Fe County Assessor',
-    url: 'https://www.santafecountynm.gov/growth-management/gis',
-    format: 'shapefile',
-    automated: false,
+    description: 'Property parcels from City of Santa Fe GIS (ArcGIS REST Service)',
+    url: 'https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer/126/query?where=1%3D1&outFields=*&f=geojson',
+    format: 'geojson',
+    automated: true,
     instructions: `
-MANUAL ACQUISITION REQUIRED:
+AUTOMATED VIA ARCGIS REST SERVICE:
 
-1. Visit Santa Fe County GIS: https://www.santafecountynm.gov/growth-management/gis
-2. Contact GIS Division to request parcel data export
-   - Email: gis@santafecountynm.gov
-   - Phone: (505) 986-6215
-3. Request shapefile or GeoJSON format with these fields:
-   - Parcel ID, Address, Zoning, Land Use, Acres, Year Built, Assessed Value
-4. Place downloaded file in: data/raw/parcels/
+The parcels layer is available from the City of Santa Fe Public Viewer:
+- ArcGIS REST Endpoint: https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer/126
+- Max records per request: 2000 (pagination handled automatically)
+- Spatial Reference: Web Mercator (3857), transformed to WGS84 (4326)
 
-Alternative (paid):
-- Regrid.com offers Santa Fe County parcel data: https://app.regrid.com/store/us/nm/santa-fe
+To fetch:
+  tsx scripts/fetch-parcels.ts
+
+Fields mapped:
+- parcel_id: parcelid or lowparceli
+- address: siteaddres
+- zoning: usecd or usedscrp
+- land_use: usedscrp
+- acres: statedarea (parsed) or calculated from Shape_STAr
+- year_built: resyrblt
+- assessed_value: cntassdval
+
+Note: This is City of Santa Fe data. For County parcels outside city limits,
+contact Santa Fe County GIS: gis@santafecountynm.gov
 `,
   },
 
   short_term_rentals: {
-    name: 'Short-Term Rentals',
-    description: 'Airbnb/VRBO listings (Inside Airbnb does not cover Santa Fe)',
-    url: 'N/A',
-    format: 'csv',
-    automated: false,
+    name: 'Short-Term Rental Permits',
+    description: 'STR permits from City of Santa Fe GIS (ArcGIS REST Service)',
+    url: 'https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer/127/query?where=1%3D1&outFields=*&f=geojson',
+    format: 'geojson',
+    automated: true,
     instructions: `
-MANUAL ACQUISITION REQUIRED:
+AUTOMATED VIA ARCGIS REST SERVICE:
 
-Inside Airbnb does not cover Santa Fe. Options:
+The STR permits layer is available from the City of Santa Fe Public Viewer:
+- ArcGIS REST Endpoint: https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer/127
+- Max records per request: 2000 (pagination handled automatically)
+- Spatial Reference: Web Mercator (3857), transformed to WGS84 (4326)
 
-1. City of Santa Fe STR Registry (if public):
-   - Contact City Planning: https://santafenm.gov/planning-and-land-use
-   - Request list of registered short-term rentals
+To fetch:
+  tsx scripts/fetch-str-permits.ts
 
-2. Data scraping (for research purposes):
-   - AirDNA provides commercial data: https://www.airdna.co/vacation-rental-data/app/us/new-mexico/santa-fe/overview
-   - May require subscription
-
-3. FOIA Request:
-   - Submit public records request to City of Santa Fe for STR permit data
-   - Include: address, property type, permit date, owner type
-
-Place data in: data/raw/short_term_rentals.csv
+Fields mapped:
+- listing_id: OBJECTID
+- address: Match_addr or Address
+- business_name: DBA or Business_N
+- property_type: Short_Term_ field
+- permit_issued_date: Business_5 (date field)
+- permit_expiry_date: Business_6 (date field)
+- source: 'other' (permit data, not Airbnb/VRBO scraping)
 `,
   },
 

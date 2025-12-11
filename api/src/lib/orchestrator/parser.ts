@@ -107,9 +107,10 @@ export class IntentParser {
     // Note about data availability
     const availabilityNote = this.availableLayers.size > 0
       ? `\nIMPORTANT: Only the layers listed above are currently available. You MUST only query these layers.
-If the user asks about data we don't have (like parcels, buildings, affordable housing, roads, etc.):
+If the user asks about data we don't have (like affordable housing, roads, etc.):
 - Still output a valid JSON query using the closest available alternative
-- For housing/property questions, use census_tracts (has income, rent data)
+- For housing/property questions, use parcels or building_footprints
+- For demographic questions, use census_tracts (has income, rent data)
 - For land use questions, use zoning_districts
 - For water/drainage questions, use hydrology\n`
       : '';
@@ -221,11 +222,89 @@ Output only the JSON object, no other text:`;
 
     const examples: string[] = [];
 
+    // Parcel examples
+    if (hasLayer('parcels')) {
+      examples.push(`User: "Show all parcels"
+{
+  "selectLayer": "parcels"
+}
+
+User: "Show residential parcels"
+{
+  "selectLayer": "parcels",
+  "attributeFilters": [
+    {"field": "land_use", "op": "like", "value": "%RESIDENTIAL%"}
+  ]
+}
+
+User: "Parcels with assessed value over 500000"
+{
+  "selectLayer": "parcels",
+  "attributeFilters": [
+    {"field": "assessed_value", "op": "gt", "value": 500000}
+  ]
+}
+
+User: "Show vacant lots"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within",
+      "targetLayer": "parcels"
+    }
+  ],
+  "attributeFilters": [
+    {"field": "land_use", "op": "like", "value": "%VACANT%"}
+  ]
+}`);
+    }
+
+    // Building footprint examples
+    if (hasLayer('building_footprints')) {
+      examples.push(`User: "Show all buildings"
+{
+  "selectLayer": "building_footprints"
+}
+
+User: "Show buildings taller than 30 feet"
+{
+  "selectLayer": "building_footprints",
+  "attributeFilters": [
+    {"field": "height", "op": "gt", "value": 30}
+  ]
+}
+
+User: "Buildings built after 2020"
+{
+  "selectLayer": "building_footprints",
+  "attributeFilters": [
+    {"field": "year_built", "op": "gt", "value": 2020}
+  ]
+}
+
+User: "Commercial buildings"
+{
+  "selectLayer": "building_footprints",
+  "attributeFilters": [
+    {"field": "building_type", "op": "like", "value": "%COMMERCIAL%"}
+  ]
+}`);
+    }
+
     // Zoning examples
     if (hasLayer('zoning_districts')) {
       examples.push(`User: "Show all zoning districts"
 {
   "selectLayer": "zoning_districts"
+}
+
+User: "Show residential zones"
+{
+  "selectLayer": "zoning_districts",
+  "attributeFilters": [
+    {"field": "allows_residential", "op": "eq", "value": true}
+  ]
 }
 
 User: "Show R1 residential zones"
@@ -234,12 +313,31 @@ User: "Show R1 residential zones"
   "attributeFilters": [
     {"field": "zone_code", "op": "like", "value": "R1%"}
   ]
+}
+
+User: "Show commercial zones"
+{
+  "selectLayer": "zoning_districts",
+  "attributeFilters": [
+    {"field": "allows_commercial", "op": "eq", "value": true}
+  ]
 }`);
     }
 
     // Census tract examples
     if (hasLayer('census_tracts')) {
-      examples.push(`User: "Census tracts with median income below 50000"
+      examples.push(`User: "Show all census tracts"
+{
+  "selectLayer": "census_tracts"
+}
+
+User: "Show census tracts by income"
+{
+  "selectLayer": "census_tracts",
+  "orderBy": {"field": "median_income", "direction": "desc"}
+}
+
+User: "Census tracts with median income below 50000"
 {
   "selectLayer": "census_tracts",
   "attributeFilters": [
@@ -255,12 +353,10 @@ User: "Show census tracts with high renter percentage"
   ]
 }
 
-User: "Census tracts with population over 2000"
+User: "Census tracts ordered by population"
 {
   "selectLayer": "census_tracts",
-  "attributeFilters": [
-    {"field": "total_population", "op": "gt", "value": 2000}
-  ]
+  "orderBy": {"field": "total_population", "direction": "desc"}
 }`);
     }
 
@@ -303,6 +399,43 @@ User: "Show all arroyos"
       "targetFilter": [{"field": "zone_code", "op": "like", "value": "C%"}]
     }
   ]
+}`);
+    }
+
+    // Short-term rental examples
+    if (hasLayer('short_term_rentals')) {
+      examples.push(`User: "Show all short-term rentals"
+{
+  "selectLayer": "short_term_rentals"
+}
+
+User: "Short-term rentals near downtown"
+{
+  "selectLayer": "short_term_rentals",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "census_tracts",
+      "distance": 1000
+    }
+  ]
+}
+
+User: "STR permits issued in 2024"
+{
+  "selectLayer": "short_term_rentals",
+  "attributeFilters": [
+    {"field": "permit_issued_date", "op": "like", "value": "2024%"}
+  ]
+}
+
+User: "Short-term rentals by neighborhood"
+{
+  "selectLayer": "short_term_rentals",
+  "aggregate": {
+    "groupBy": ["address"],
+    "metrics": [{"field": "*", "op": "count", "alias": "str_count"}]
+  }
 }`);
     }
 

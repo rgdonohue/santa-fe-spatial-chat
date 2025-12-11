@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { Feature, Geometry } from 'geojson';
 import { ChatPanel } from './components/ChatPanel';
 import { MapView } from './components/MapView';
 import { ResultsPanel } from './components/ResultsPanel';
 import { sendChatMessage, ApiClientError } from './lib/api';
+import { getChoroplethConfig } from './lib/choropleth';
 import type { ChatMessage, StructuredQuery } from './types/api';
 import './App.css';
 
@@ -105,6 +106,17 @@ function App() {
     setSelectedFeature(null);
   }, []);
 
+  // Compute choropleth configuration based on current query and features
+  const choroplethConfig = useMemo(() => {
+    const config = getChoroplethConfig(currentQuery, features);
+    console.log('Choropleth config:', {
+      layer: currentQuery?.selectLayer,
+      featureCount: features.length,
+      config
+    });
+    return config;
+  }, [currentQuery, features]);
+
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
@@ -119,6 +131,7 @@ function App() {
           features={features}
           selectedFeature={selectedFeature}
           onFeatureClick={handleFeatureClick}
+          choroplethConfig={choroplethConfig}
         />
       </main>
       {showResults && (

@@ -45,6 +45,12 @@
 .legend-title {
   flex: 1;
   font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.legend-scale {
+  padding: 0.5rem 0.75rem;
 }
 
 .legend-count {

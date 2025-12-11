@@ -24,7 +24,8 @@ export const attributeFilterSchema: z.ZodType<AttributeFilter> = z.object({
   value: z.union([
     z.string(),
     z.number(),
-    z.array(z.union([z.string(), z.number()])),
+    z.boolean(),
+    z.array(z.union([z.string(), z.number(), z.boolean()])),
   ]),
 });
 

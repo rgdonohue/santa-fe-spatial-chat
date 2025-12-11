@@ -52,7 +52,7 @@ export type OrderDirection = 'asc' | 'desc';
 export interface AttributeFilter {
   field: string;
   op: AttributeOp;
-  value: string | number | (string | number)[];
+  value: string | number | boolean | (string | number | boolean)[];
 }
 
 /**

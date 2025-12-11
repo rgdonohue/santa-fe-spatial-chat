@@ -83,12 +83,31 @@ export type ZoningDistrictCollection = FeatureCollection<
   ZoningDistrictProperties
 >;
 
+/**
+ * Building footprint properties
+ */
+export interface BuildingFootprintProperties {
+  building_id: string;
+  address: string | null;
+  building_type: string | null;
+  height: number | null; // Height in feet
+  year_built: number | null;
+  source: string | null; // Data source (e.g., "LIDAR", "SURVEY")
+  source_year: number | null;
+}
+
+export type BuildingFootprintFeature = Feature<Polygon, BuildingFootprintProperties>;
+export type BuildingFootprintCollection = FeatureCollection<
+  Polygon,
+  BuildingFootprintProperties
+>;
+
 // ============================================================================
 // Housing-Focused Types
 // ============================================================================
 
 /**
- * Short-term rental properties (Airbnb/VRBO)
+ * Short-term rental properties (Airbnb/VRBO or permit data)
  */
 export interface ShortTermRentalProperties {
   listing_id: string;
@@ -100,6 +119,10 @@ export interface ShortTermRentalProperties {
   availability_365: number | null; // Days available per year
   last_scraped: string | null; // ISO date string
   source: 'airbnb' | 'vrbo' | 'other';
+  address: string | null; // Full address
+  business_name: string | null; // DBA or business name
+  permit_issued_date: string | null; // ISO date string (YYYY-MM-DD)
+  permit_expiry_date: string | null; // ISO date string (YYYY-MM-DD)
 }
 
 export type ShortTermRentalFeature = Feature<Point, ShortTermRentalProperties>;
@@ -346,10 +369,24 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       max_density_units_per_acre: 'number | null',
     },
   },
+  building_footprints: {
+    name: 'building_footprints',
+    geometryType: 'Polygon',
+    description: 'Building footprints with height and type information',
+    fields: {
+      building_id: 'string',
+      address: 'string | null',
+      building_type: 'string | null',
+      height: 'number | null',
+      year_built: 'number | null',
+      source: 'string | null',
+      source_year: 'number | null',
+    },
+  },
   short_term_rentals: {
     name: 'short_term_rentals',
     geometryType: 'Point',
-    description: 'Short-term rental listings (Airbnb/VRBO)',
+    description: 'Short-term rental listings and permits (Airbnb/VRBO or City permits)',
     fields: {
       listing_id: 'string',
       host_id: 'string | null',
@@ -360,6 +397,10 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       availability_365: 'number | null',
       last_scraped: 'string | null',
       source: 'string', // 'airbnb' | 'vrbo' | 'other'
+      address: 'string | null',
+      business_name: 'string | null',
+      permit_issued_date: 'string | null',
+      permit_expiry_date: 'string | null',
     },
   },
   vacancy_status: {
@@ -678,6 +719,21 @@ export function isWildfireRiskFeature(
   );
 }
 
+/**
+ * Type guard for BuildingFootprintFeature
+ */
+export function isBuildingFootprintFeature(
+  feature: Feature
+): feature is BuildingFootprintFeature {
+  if (feature.geometry.type !== 'Polygon') return false;
+  const props = feature.properties;
+  return (
+    typeof props === 'object' &&
+    props !== null &&
+    typeof props.building_id === 'string'
+  );
+}
+
 // ============================================================================
 // Utility Types
 // ============================================================================
@@ -690,6 +746,7 @@ export type AnyFeature =
   | CensusTractFeature
   | HydrologyFeature
   | ZoningDistrictFeature
+  | BuildingFootprintFeature
   | ShortTermRentalFeature
   | VacancyStatusFeature
   | AffordableHousingFeature
@@ -708,6 +765,7 @@ export type AnyProperties =
   | CensusTractProperties
   | HydrologyProperties
   | ZoningDistrictProperties
+  | BuildingFootprintProperties
   | ShortTermRentalProperties
   | VacancyStatusProperties
   | AffordableHousingProperties
