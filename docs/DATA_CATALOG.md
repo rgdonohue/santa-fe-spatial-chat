@@ -23,11 +23,10 @@ This catalog consolidates data provenance from `DATA_SOURCES.md` with live stati
 
 ---
 
-## Pending Layers (8)
+## Pending Layers (7)
 
 | Layer | Schema Ready | Priority | Source Status | Notes |
 |-------|-------------|----------|---------------|-------|
-| **transit_access** | ✅ | 🔴 High | GTFS likely available | Santa Fe Trails GTFS data |
 | **affordable_housing_units** | ✅ | 🔴 High | Manual acquisition | City/County Housing Dept |
 | **vacancy_status** | ✅ | 🟡 Medium | Derived data | Assessor + USPS vacancy |
 | **eviction_filings** | ✅ | 🟡 Medium | Privacy-sensitive | NM court records |
