@@ -29,6 +29,13 @@ export class QueryBuilder {
    * Build the complete SQL query
    */
   build(): { sql: string; params: unknown[] } {
+    // Check if we have a nearest neighbor query - requires special handling
+    const hasNearestFilter = this.query.spatialFilters?.some(f => f.op === 'nearest');
+    
+    if (hasNearestFilter) {
+      return this.buildNearestNeighborQuery();
+    }
+
     const parts: string[] = [];
 
     // SELECT clause
@@ -229,18 +236,9 @@ export class QueryBuilder {
         )`;
 
       case 'nearest': {
-        // Nearest requires ORDER BY and LIMIT, handled differently
-        // For now, use a subquery approach
-        if (!filter.limit) {
-          throw new Error('nearest requires limit parameter');
-        }
-        // Note: limitParam not currently used - nearest uses fixed distance approach
-        // TODO: Implement proper nearest neighbor query with ORDER BY distance LIMIT
-        return `ST_DWithin(
-          ${sourceGeom},
-          (${targetSubquery}),
-          10000
-        )`; // Use a large distance, then order by distance and limit
+        // Nearest neighbor queries are handled in buildNearestNeighborQuery()
+        // This case should not be reached in buildSpatialCondition for nearest
+        throw new Error('nearest operation should be handled by buildNearestNeighborQuery()');
       }
 
       default:
@@ -305,6 +303,101 @@ export class QueryBuilder {
     // Simple escaping - wrap in double quotes
     // In production, you might want more robust escaping
     return `"${identifier.replace(/"/g, '""')}"`;
+  }
+
+  /**
+   * Build query for nearest neighbor operations
+   * Uses proper k-NN with ORDER BY distance LIMIT
+   */
+  private buildNearestNeighborQuery(): { sql: string; params: unknown[] } {
+    // Find the nearest filter (should only be one for now)
+    const nearestFilter = this.query.spatialFilters?.find(f => f.op === 'nearest');
+    if (!nearestFilter || !nearestFilter.limit) {
+      throw new Error('nearest operation requires limit parameter');
+    }
+
+    // Validate layers
+    this.validateLayer(this.query.selectLayer);
+    this.validateLayer(nearestFilter.targetLayer);
+
+    // Build target geometry subquery
+    const useProjected = true; // Always use projected for distance calculations
+    const sourceGeom = 'geom_utm13';
+    const targetGeom = 'target_geom_utm13';
+    
+    const targetSubquery = this.buildTargetSubquery(nearestFilter);
+
+    // Build SELECT clause with distance calculation
+    const fields: string[] = [];
+    if (this.query.selectFields && this.query.selectFields.length > 0) {
+      const selectFields = this.query.selectFields.map((f) =>
+        this.escapeIdentifier(f)
+      );
+      fields.push(...selectFields);
+    } else {
+      fields.push('* EXCLUDE (geom_4326, geom_utm13)');
+    }
+    
+    // Add distance calculation
+    // Note: targetSubquery returns a single geometry (ST_Union), so we can use it directly
+    fields.push(`ST_Distance(${sourceGeom}, (${targetSubquery})) AS distance`);
+    fields.push('ST_AsGeoJSON(geom_4326) AS geometry');
+
+    // Build WHERE clause for other filters (excluding nearest)
+    const otherFilters = this.query.spatialFilters?.filter(f => f.op !== 'nearest') || [];
+    const whereConditions: string[] = [];
+
+    // Attribute filters
+    if (this.query.attributeFilters && this.query.attributeFilters.length > 0) {
+      const logic = this.query.attributeLogic ?? 'and';
+      const attrConditions = this.query.attributeFilters.map((f) =>
+        this.buildAttributeCondition(f)
+      );
+      if (attrConditions.length > 1) {
+        whereConditions.push(`(${attrConditions.join(` ${logic.toUpperCase()} `)})`);
+      } else {
+        whereConditions.push(attrConditions[0]!);
+      }
+    }
+
+    // Other spatial filters (excluding nearest)
+    if (otherFilters.length > 0) {
+      const logic = this.query.spatialLogic ?? 'and';
+      const spatialConditions = otherFilters.map((f) =>
+        this.buildSpatialCondition(f)
+      );
+      if (spatialConditions.length > 1) {
+        whereConditions.push(`(${spatialConditions.join(` ${logic.toUpperCase()} `)})`);
+      } else {
+        whereConditions.push(spatialConditions[0]!);
+      }
+    }
+
+    // Build the query
+    const parts: string[] = [];
+    parts.push(`SELECT ${fields.join(', ')}`);
+    parts.push(`FROM ${this.escapeIdentifier(this.query.selectLayer)}`);
+    
+    if (whereConditions.length > 0) {
+      parts.push(`WHERE ${whereConditions.join(' AND ')}`);
+    }
+
+    // ORDER BY distance (ascending - nearest first)
+    parts.push(`ORDER BY distance ASC`);
+
+    // LIMIT to k nearest neighbors
+    const limitParam = this.addParam(nearestFilter.limit);
+    parts.push(`LIMIT ${limitParam}`);
+
+    // If query has its own limit, apply it as well (but k-NN limit takes precedence)
+    if (this.query.limit !== undefined && this.query.limit < nearestFilter.limit) {
+      // Use the smaller limit
+      parts.pop(); // Remove k-NN limit
+      const queryLimitParam = this.addParam(this.query.limit);
+      parts.push(`LIMIT ${queryLimitParam}`);
+    }
+
+    return { sql: parts.join('\n'), params: this.params };
   }
 
   /**

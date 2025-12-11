@@ -281,6 +281,95 @@ describe('QueryBuilder', () => {
     });
   });
 
+  describe('Nearest neighbor queries', () => {
+    it('builds proper k-NN query with ORDER BY distance LIMIT', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        spatialFilters: [
+          {
+            op: 'nearest',
+            targetLayer: 'transit_access',
+            limit: 5,
+          },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql, params } = builder.build();
+
+      // Should use ORDER BY distance ASC
+      expect(sql).toContain('ORDER BY distance ASC');
+      // Should use LIMIT with k value
+      expect(sql).toContain('LIMIT');
+      expect(params).toContain(5);
+      // Should use projected geometry for distance calculation
+      expect(sql).toContain('geom_utm13');
+      // Should calculate distance
+      expect(sql).toContain('ST_Distance');
+      // Should not use the old 10km buffer hack
+      expect(sql).not.toContain('10000');
+      expect(sql).not.toContain('ST_DWithin');
+    });
+
+    it('builds k-NN query with target filter', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        spatialFilters: [
+          {
+            op: 'nearest',
+            targetLayer: 'transit_access',
+            targetFilter: [{ field: 'stop_type', op: 'eq', value: 'bus' }],
+            limit: 3,
+          },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).toContain('ORDER BY distance ASC');
+      expect(sql).toContain('stop_type');
+      expect(sql).toContain('LIMIT');
+    });
+
+    it('builds k-NN query with attribute filters', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        attributeFilters: [{ field: 'zoning', op: 'eq', value: 'R-1' }],
+        spatialFilters: [
+          {
+            op: 'nearest',
+            targetLayer: 'transit_access',
+            limit: 10,
+          },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).toContain('ORDER BY distance ASC');
+      expect(sql).toContain('zoning');
+      expect(sql).toContain('LIMIT');
+    });
+
+    it('throws error for nearest without limit', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        spatialFilters: [
+          {
+            op: 'nearest',
+            targetLayer: 'transit_access',
+            // Missing limit
+          },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      expect(() => builder.build()).toThrow('nearest operation requires limit');
+    });
+  });
+
   describe('CRS selection', () => {
     it('uses projected geometry for metric operations', () => {
       const metricOps: Array<'within_distance' | 'nearest'> = [
