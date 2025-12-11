@@ -37,6 +37,7 @@ export function setDatabase(db: Database): void {
 
 /**
  * Convert BigInt values to numbers for JSON serialization
+ * Also parses JSON strings back to arrays for fields like route_ids/route_names
  */
 function convertBigInts(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -44,6 +45,18 @@ function convertBigInts(obj: Record<string, unknown>): Record<string, unknown> {
     if (typeof value === 'bigint') {
       // Convert to number if it fits, otherwise string
       result[key] = Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
+    } else if (
+      typeof value === 'string' &&
+      (key === 'route_ids' || key === 'route_names' || key === 'restrictions')
+    ) {
+      // Parse JSON strings back to arrays for array fields
+      try {
+        const parsed = JSON.parse(value);
+        result[key] = Array.isArray(parsed) ? parsed : value;
+      } catch {
+        // If parsing fails, keep as string
+        result[key] = value;
+      }
     } else {
       result[key] = value;
     }

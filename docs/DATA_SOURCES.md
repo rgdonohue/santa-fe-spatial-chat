@@ -23,7 +23,7 @@ Document each dataset used in the project, its provenance, update cadence, known
 | transit_access | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | Bus stops from Santa Fe Trails. Max 2000 records per request (pagination handled) |
 | school_zones | School district GIS | Annual? | WGS84/UTM13 (converted) | TBD | Verify grade coverage and overlaps |
 | historic_districts | City GIS | Annual? | WGS84/UTM13 (converted) | TBD | Note restrictions affecting development |
-| flood_zones | FEMA NFHL | As published | WGS84/UTM13 (converted) | FEMA terms | Check for latest revisions |
+| flood_zones | FEMA NFHL (MSC Portal) | As published | WGS84/UTM13 (converted) | FEMA terms | Manual download required - ArcGIS REST API has limitations. Download from https://msc.fema.gov/portal/advanceSearch |
 | wildfire_risk | USFS/State | Annual? | WGS84/UTM13 (converted) | TBD | Resolution may limit parcel-level accuracy |
 | water_rights/acequia_service | State/Local | TBD | WGS84/UTM13 (converted) | TBD | NM-specific considerations; data availability varies |
 

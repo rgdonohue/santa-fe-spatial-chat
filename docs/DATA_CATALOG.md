@@ -33,7 +33,7 @@ This catalog consolidates data provenance from `DATA_SOURCES.md` with live stati
 | **eviction_filings** | ✅ | 🟡 Medium | Privacy-sensitive | NM court records |
 | **school_zones** | ✅ | 🟡 Medium | Likely available | School district GIS |
 | **historic_districts** | ✅ | 🟢 Low | Likely in City GIS | Similar fetch pattern |
-| **flood_zones** | ✅ | 🟢 Low | FEMA NFHL public | Standardized format |
+| **flood_zones** | ✅ | 🟡 Medium | Manual download required | FEMA NFHL ArcGIS REST has API limitations. Use MSC portal download instead |
 | **wildfire_risk** | ✅ | 🟢 Low | USFS/State | May need processing |
 
 ---

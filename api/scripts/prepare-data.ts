@@ -609,6 +609,8 @@ async function processLayer(
               }
 
               // Export to GeoParquet
+              // Note: DuckDB stores arrays as JSON strings in Parquet
+              // Arrays will be parsed back to arrays in rowToFeature() functions
               const exportSql = `
                 COPY (
                   SELECT
