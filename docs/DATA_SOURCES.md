@@ -1,41 +1,176 @@
 # Santa Fe Spatial Chat — Data Sources
 
-Document each dataset used in the project, its provenance, update cadence, known limitations, and licensing/attribution requirements. Keep this file updated as layers are added.
+Document each dataset used in the project, its provenance, update cadence, known limitations, and licensing/attribution requirements.
 
-## Core Layers
+## Primary Data Source
 
-| Layer | Source | Update Cadence | CRS | License/Attribution | Notes/Limitations |
-|-------|--------|----------------|-----|---------------------|-------------------|
-| parcels | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | City limits only; County parcels require separate source. Max 2000 records per request (pagination handled) |
-| building_footprints | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | Building polygons with height, type, and year built. Max 2000 records per request (pagination handled) |
-| census_tracts | US Census ACS | Annual (ACS 1/5-year) | WGS84/UTM13 (converted) | Public domain (US Gov) | Include income, housing stock metrics |
-| hydrology | City/County GIS | TBD | WGS84/UTM13 (converted) | TBD | Verify naming for rivers/arroyos |
-| zoning_districts | City of Santa Fe GIS | TBD | WGS84/UTM13 (converted) | TBD | Map zone codes to readable names |
+**City of Santa Fe Public Viewer MapServer**
+```
+https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer
+```
+- 122 layers available
+- Public domain (City GIS)
+- Max 2000 records per request (pagination handled in fetch scripts)
+- Coordinates in Web Mercator (3857), converted to WGS84/UTM13
 
-## Housing-Focused Layers
+---
 
-| Layer | Source | Update Cadence | CRS | License/Attribution | Notes/Limitations |
-|-------|--------|----------------|-----|---------------------|-------------------|
-| short_term_rentals | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | STR permit data with addresses and permit dates. Max 2000 records per request (pagination handled) |
-| affordable_housing_units | City/County Housing Dept | Quarterly? | WGS84/UTM13 (converted) | TBD | Track deed restrictions and expiry dates |
-| vacancy_status | Assessor + USPS vacancy | Annual? | WGS84/UTM13 (converted) | TBD | Distinguish seasonal vs long-term vacancy |
-| eviction_filings | NM court records (geocoded) | Monthly? | WGS84/UTM13 (converted) | TBD | Address parsing quality; privacy considerations |
-| transit_access | City of Santa Fe GIS (ArcGIS REST) | As updated | WGS84/UTM13 (converted from 3857) | Public domain (City GIS) | Bus stops from Santa Fe Trails. Max 2000 records per request (pagination handled) |
-| school_zones | School district GIS | Annual? | WGS84/UTM13 (converted) | TBD | Verify grade coverage and overlaps |
-| historic_districts | City GIS | Annual? | WGS84/UTM13 (converted) | TBD | Note restrictions affecting development |
-| flood_zones | FEMA NFHL (MSC Portal) | As published | WGS84/UTM13 (converted) | FEMA terms | Manual download required - ArcGIS REST API has limitations. Download from https://msc.fema.gov/portal/advanceSearch |
-| wildfire_risk | USFS/State | Annual? | WGS84/UTM13 (converted) | TBD | Resolution may limit parcel-level accuracy |
-| water_rights/acequia_service | State/Local | TBD | WGS84/UTM13 (converted) | TBD | NM-specific considerations; data availability varies |
+## Loaded Layers (13)
 
-## Methodology Notes
+### Core Infrastructure
 
-- **CRS**: Ingest with SRID check; transform to WGS84 (`geom_4326`) and UTM 13N (`geom_utm13`) for metric operations.
-- **Attribution**: Add required attribution strings to README/UI if licenses demand it.
-- **Quality checks**: Log invalid geometries, nulls in key fields, and deduplicate records during ingest.
-- **Versioning**: Record dataset versions/dates in `data/manifest.json` to keep changes auditable.
+| Layer | Source | Layer ID | Update Cadence | License | Notes |
+|-------|--------|----------|----------------|---------|-------|
+| parcels | City ArcGIS REST | 126 | As updated | Public domain | City limits only; 63,439 features |
+| building_footprints | City ArcGIS REST | 3 | As updated | Public domain | Height, type, year built; 42,630 features |
+| zoning_districts | City ArcGIS REST | 7 | As updated | Public domain | Zone codes and names; 851 features |
+| census_tracts | US Census TIGER + ACS | — | Annual | Public domain (US Gov) | Demographics, income, housing; 57 features |
+| hydrology | City/County GIS | 27 | As updated | Public domain | Arroyos, streams; 109 features |
 
-## To Do
+### Boundaries & Districts
 
-- Fill in exact sources/URLs and licenses.
-- Define update cadences with data owners.
-- Add any additional housing-relevant layers as they are incorporated.
+| Layer | Source | Layer ID | Update Cadence | License | Notes |
+|-------|--------|----------|----------------|---------|-------|
+| city_limits | City ArcGIS REST | 99 | As updated | Public domain | Municipal boundary; 1 feature |
+| neighborhoods | City ArcGIS REST | 101 | As updated | Public domain | Neighborhood associations; 106 features |
+| historic_districts | City ArcGIS REST | 118 | As updated | Public domain | Preservation districts; 5 features |
+| flood_zones | City ArcGIS REST (FEMA) | 32 | 2012 data | Public domain | 100-yr flood plain; 227 features |
+
+### Housing & Access
+
+| Layer | Source | Layer ID | Update Cadence | License | Notes |
+|-------|--------|----------|----------------|---------|-------|
+| short_term_rentals | City ArcGIS REST | 127 | As updated | Public domain | STR permits; 897 features |
+| transit_access | City ArcGIS REST | 67 | As updated | Public domain | Bus stops; 447 features |
+| parks | City ArcGIS REST | 75 | As updated | Public domain | City parks; 77 features |
+| bikeways | City ArcGIS REST | 72 | As updated | Public domain | Bike routes; 536 features |
+
+---
+
+## Pending Layers (5)
+
+| Layer | Potential Source | Status | Notes |
+|-------|------------------|--------|-------|
+| affordable_housing_units | City/County Housing Dept | 🔴 Manual acquisition | Need to contact housing authority for deed-restricted unit locations |
+| vacancy_status | Derived | 🟡 Needs processing | Combine assessor occupancy + USPS vacancy data |
+| eviction_filings | NM Courts | 🟡 Privacy-sensitive | Requires geocoding; privacy considerations |
+| school_zones | School District GIS | 🟡 Different source | City GIS Layer 22 has points only, not attendance zones |
+| wildfire_risk | USFS/NM State Forestry | 🟢 Available | Need to identify and process for Santa Fe extent |
+
+---
+
+## Data Acquisition Notes
+
+### Affordable Housing
+**Status:** Requires manual outreach or geocoding
+
+**Option 1: Local Data (Preferred)**
+- **Contact:** City of Santa Fe Housing Division or Santa Fe County Housing Authority
+- **Phone:** (505) 955-6339 (City Housing)
+- **Data needed:** Deed-restricted unit locations, AMI restrictions, expiration dates
+- LIHTC-funded projects provide 1,760 units in Santa Fe (40-80% AMI)
+
+**Option 2: HUD LIHTC Database**
+- **URL:** https://www.huduser.gov/lihtc/
+- **Format:** CSV with addresses (requires geocoding)
+- **Limitation:** National database, may not include all local programs
+
+**Option 3: National Housing Preservation Database (NHPD)**
+- **URL:** https://preservationdatabase.org/
+- **Access:** Registration required for data download
+- **Content:** Federally assisted rental housing inventory
+
+### School Zones
+**Status:** Requires school district data
+
+- **Issue:** City GIS Layer 22 contains school points only (no attendance zones)
+- **Contact:** Santa Fe Public Schools - (505) 467-2000
+- **Alternative:** Derive Voronoi/Thiessen polygons from school points
+- **Note:** Charter schools may not have defined attendance zones
+
+### Wildfire Risk
+**Status:** Raster data available; vectorization needed
+
+**Sources Investigated:**
+- **USFS Wildfire Risk to Communities:** https://wildfirerisk.org/download/
+  - State-level GIS data via Forest Service Research Data Archive
+  - Format: 270m raster (requires vectorization for parcel analysis)
+- **NM Wildfire Risk Portal (NMWRAP):** https://nmwrap.org/
+  - Contact: nmwrap@edac.unm.edu
+- **City WIRE Hub:** https://santafe-wire.hub.arcgis.com/
+  - 2006 Community Wildfire Hazard Ratings
+  - Contact: pnchavarria@santafenm.gov
+
+**Challenge:** Wildfire risk is typically raster data at 270m resolution. Converting to parcel-level polygons requires:
+1. Download state raster from USFS
+2. Clip to Santa Fe extent
+3. Vectorize or sample to parcel centroids
+
+### Vacancy Status
+**Status:** Derived layer (no direct source)
+
+- **Method:** Combine multiple indicators:
+  1. Assessor "owner-occupied" flags (from parcel data)
+  2. USPS vacancy indicator data (if available via FOIA)
+  3. Utility connection status (requires utility company data)
+- **Challenge:** Distinguishing seasonal vacancy from long-term vacancy
+- **Alternative:** Use building permit activity + ownership transfer records
+
+---
+
+## Fetch Scripts
+
+| Script | Layers | Source |
+|--------|--------|--------|
+| `scripts/fetch-parcels.ts` | parcels | Layer 126 |
+| `scripts/fetch-buildings.ts` | building_footprints | Layer 3 |
+| `scripts/fetch-str-permits.ts` | short_term_rentals | Layer 127 |
+| `scripts/fetch-transit.ts` | transit_access | Layer 67 |
+| `scripts/fetch-flood-zones-city.ts` | flood_zones | Layer 32 |
+| `scripts/fetch-historic-districts.ts` | historic_districts | Layer 118 |
+| `scripts/fetch-neighborhoods.ts` | neighborhoods | Layer 101 |
+| `scripts/fetch-city-limits.ts` | city_limits | Layer 99 |
+| `scripts/fetch-parks.ts` | parks | Layer 75 |
+| `scripts/fetch-bikeways.ts` | bikeways | Layer 72 |
+| `scripts/fetch-public-data.ts` | census, zoning, hydrology | Various |
+
+---
+
+## Methodology
+
+### CRS Convention
+- **geom_4326** (WGS84): Display and topological operations (intersects, contains, within)
+- **geom_utm13** (EPSG:32613): Metric operations (distance, buffer, area)
+
+### Data Processing
+1. Fetch from ArcGIS REST with pagination (2000 records/request)
+2. Convert Web Mercator (3857) → WGS84 (4326)
+3. Map source fields to schema-compliant field names
+4. Export to GeoParquet with dual geometries
+5. Update manifest.json with metadata
+
+### Quality Checks
+- Invalid geometry detection and logging
+- Null value handling for key fields
+- Deduplication where applicable
+- Extent validation against expected bounds
+
+---
+
+## Attribution Requirements
+
+| Source | Attribution |
+|--------|-------------|
+| City of Santa Fe GIS | "Data provided by City of Santa Fe GIS" |
+| US Census Bureau | "Source: U.S. Census Bureau, American Community Survey" |
+| FEMA NFHL | "Flood data from FEMA National Flood Hazard Layer" |
+
+---
+
+## Update Log
+
+| Date | Change |
+|------|--------|
+| 2025-12-13 | Added flood_zones, historic_districts, neighborhoods, city_limits, parks, bikeways |
+| 2025-12-11 | Added transit_access, short_term_rentals, building_footprints, parcels |
+| 2025-12-07 | Initial layers: census_tracts, zoning_districts, hydrology |
