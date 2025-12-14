@@ -283,6 +283,70 @@ export type WildfireRiskCollection = FeatureCollection<
   WildfireRiskProperties
 >;
 
+/**
+ * Neighborhood associations
+ */
+export interface NeighborhoodProperties {
+  neighborhood_id: string;
+  name: string;
+  type: string;
+  established_date: string | null;
+  notes: string | null;
+}
+
+export type NeighborhoodFeature = Feature<Polygon, NeighborhoodProperties>;
+export type NeighborhoodCollection = FeatureCollection<
+  Polygon,
+  NeighborhoodProperties
+>;
+
+/**
+ * City limits boundary
+ */
+export interface CityLimitsProperties {
+  boundary_id: string;
+  name: string;
+  area_sq_mi: number | null;
+  area_acres: number | null;
+}
+
+export type CityLimitsFeature = Feature<Polygon, CityLimitsProperties>;
+export type CityLimitsCollection = FeatureCollection<
+  Polygon,
+  CityLimitsProperties
+>;
+
+/**
+ * City parks
+ */
+export interface ParkProperties {
+  park_id: string;
+  name: string;
+  park_type: string;
+  owner: string;
+  acres: number | null;
+  trail_miles: number | null;
+  status: string | null;
+  council_district: string | null;
+}
+
+export type ParkFeature = Feature<Polygon, ParkProperties>;
+export type ParkCollection = FeatureCollection<Polygon, ParkProperties>;
+
+/**
+ * Bikeways
+ */
+export interface BikewayProperties {
+  bikeway_id: string;
+  name: string | null;
+  bikeway_type: string;
+  surface: string | null;
+  length_miles: number | null;
+}
+
+export type BikewayFeature = Feature<LineString, BikewayProperties>;
+export type BikewayCollection = FeatureCollection<LineString, BikewayProperties>;
+
 // ============================================================================
 // Layer Schema Registry
 // ============================================================================
@@ -505,6 +569,56 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       risk_level: 'string', // 'extreme' | 'high' | 'moderate' | 'low'
       fuel_model: 'string | null',
       source: 'string',
+    },
+  },
+  neighborhoods: {
+    name: 'neighborhoods',
+    geometryType: 'Polygon',
+    description: 'Neighborhood associations for community-level analysis',
+    fields: {
+      neighborhood_id: 'string',
+      name: 'string',
+      type: 'string',
+      established_date: 'string | null',
+      notes: 'string | null',
+    },
+  },
+  city_limits: {
+    name: 'city_limits',
+    geometryType: 'Polygon',
+    description: 'City of Santa Fe municipal boundary',
+    fields: {
+      boundary_id: 'string',
+      name: 'string',
+      area_sq_mi: 'number | null',
+      area_acres: 'number | null',
+    },
+  },
+  parks: {
+    name: 'parks',
+    geometryType: 'Polygon',
+    description: 'City parks and recreational areas',
+    fields: {
+      park_id: 'string',
+      name: 'string',
+      park_type: 'string',
+      owner: 'string',
+      acres: 'number | null',
+      trail_miles: 'number | null',
+      status: 'string | null',
+      council_district: 'string | null',
+    },
+  },
+  bikeways: {
+    name: 'bikeways',
+    geometryType: 'LineString',
+    description: 'Bicycle routes and paths',
+    fields: {
+      bikeway_id: 'string',
+      name: 'string | null',
+      bikeway_type: 'string',
+      surface: 'string | null',
+      length_miles: 'number | null',
     },
   },
 } as const;
@@ -755,7 +869,11 @@ export type AnyFeature =
   | SchoolZoneFeature
   | HistoricDistrictFeature
   | FloodZoneFeature
-  | WildfireRiskFeature;
+  | WildfireRiskFeature
+  | NeighborhoodFeature
+  | CityLimitsFeature
+  | ParkFeature
+  | BikewayFeature;
 
 /**
  * Union type of all property types
@@ -774,7 +892,11 @@ export type AnyProperties =
   | SchoolZoneProperties
   | HistoricDistrictProperties
   | FloodZoneProperties
-  | WildfireRiskProperties;
+  | WildfireRiskProperties
+  | NeighborhoodProperties
+  | CityLimitsProperties
+  | ParkProperties
+  | BikewayProperties;
 
 /**
  * Layer name type (keys of LAYER_SCHEMAS)

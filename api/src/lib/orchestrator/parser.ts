@@ -467,6 +467,162 @@ User: "Short-term rentals by neighborhood"
 }`);
     }
 
+    // Flood zone examples
+    if (hasLayer('flood_zones')) {
+      examples.push(`User: "Show flood zones"
+{
+  "selectLayer": "flood_zones"
+}
+
+User: "High risk flood areas"
+{
+  "selectLayer": "flood_zones",
+  "attributeFilters": [
+    {"field": "flood_risk_level", "op": "eq", "value": "high"}
+  ]
+}
+
+User: "Parcels in flood zones"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "intersects",
+      "targetLayer": "flood_zones"
+    }
+  ]
+}`);
+    }
+
+    // Historic district examples
+    if (hasLayer('historic_districts')) {
+      examples.push(`User: "Show historic districts"
+{
+  "selectLayer": "historic_districts"
+}
+
+User: "Parcels in historic districts"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within",
+      "targetLayer": "historic_districts"
+    }
+  ]
+}`);
+    }
+
+    // Neighborhood examples
+    if (hasLayer('neighborhoods')) {
+      examples.push(`User: "Show all neighborhoods"
+{
+  "selectLayer": "neighborhoods"
+}
+
+User: "STRs by neighborhood"
+{
+  "selectLayer": "short_term_rentals",
+  "spatialFilters": [
+    {
+      "op": "within",
+      "targetLayer": "neighborhoods"
+    }
+  ]
+}
+
+User: "Parcels in a specific neighborhood"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within",
+      "targetLayer": "neighborhoods",
+      "targetFilter": [{"field": "name", "op": "like", "value": "%Downtown%"}]
+    }
+  ]
+}`);
+    }
+
+    // City limits examples
+    if (hasLayer('city_limits')) {
+      examples.push(`User: "Show city limits"
+{
+  "selectLayer": "city_limits"
+}
+
+User: "Parcels within city limits"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within",
+      "targetLayer": "city_limits"
+    }
+  ]
+}`);
+    }
+
+    // Parks examples
+    if (hasLayer('parks')) {
+      examples.push(`User: "Show all parks"
+{
+  "selectLayer": "parks"
+}
+
+User: "Parcels near parks"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "parks",
+      "distance": 400
+    }
+  ]
+}
+
+User: "Large parks over 10 acres"
+{
+  "selectLayer": "parks",
+  "attributeFilters": [
+    {"field": "acres", "op": "gt", "value": 10}
+  ]
+}`);
+    }
+
+    // Bikeways examples
+    if (hasLayer('bikeways')) {
+      examples.push(`User: "Show bikeways"
+{
+  "selectLayer": "bikeways"
+}
+
+User: "Parcels near bike paths"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "bikeways",
+      "distance": 200
+    }
+  ]
+}
+
+User: "Transit stops along bikeways"
+{
+  "selectLayer": "transit_access",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "bikeways",
+      "distance": 100
+    }
+  ]
+}`);
+    }
+
     // Add fallback examples for unavailable data requests
     if (hasLayer('census_tracts')) {
       examples.push(`User: "Show affordable housing locations"
