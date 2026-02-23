@@ -3,8 +3,10 @@ dist/
 .env
 .env.local
 *.log
+.DS_Store
 
 # Data files (large, generated)
+data/raw/
 api/data/*.parquet
 api/data/raw/
 api/data/manifest.json
