@@ -24,6 +24,7 @@ export interface ParseResult {
  */
 export class IntentParser {
   private availableLayers: Set<string> = new Set();
+  private availableLayerFields: Map<string, Set<string>> = new Map();
 
   constructor(private llm: LLMClient) {}
 
@@ -33,6 +34,19 @@ export class IntentParser {
    */
   setAvailableLayers(layers: string[]): void {
     this.availableLayers = new Set(layers);
+  }
+
+  /**
+   * Set runtime-queryable fields for each loaded layer.
+   * This keeps prompts aligned with actual loaded data columns.
+   */
+  setAvailableLayerFields(layerFields: Record<string, string[]>): void {
+    this.availableLayerFields = new Map(
+      Object.entries(layerFields).map(([layerName, fields]) => [
+        layerName,
+        new Set(fields),
+      ])
+    );
   }
 
   /**
@@ -97,23 +111,16 @@ export class IntentParser {
     // Build layer schema descriptions
     const layerDescriptions = layersToShow
       .map((schema) => {
-        const fields = Object.entries(schema.fields)
+        const runtimeFieldSet = this.availableLayerFields.get(schema.name);
+        const fieldEntries = runtimeFieldSet
+          ? Object.entries(schema.fields).filter(([name]) => runtimeFieldSet.has(name))
+          : Object.entries(schema.fields);
+        const fields = fieldEntries
           .map(([name, type]) => `    - ${name}: ${type}`)
           .join('\n');
         return `  - ${schema.name} (${schema.geometryType}): ${schema.description || 'No description'}\n${fields}`;
       })
       .join('\n\n');
-
-    // Note about data availability
-    const availabilityNote = this.availableLayers.size > 0
-      ? `\nIMPORTANT: Only the layers listed above are currently available. You MUST only query these layers.
-If the user asks about data we don't have (like affordable housing, roads, etc.):
-- Still output a valid JSON query using the closest available alternative
-- For housing/property questions, use parcels or building_footprints
-- For demographic questions, use census_tracts (has income, rent data)
-- For land use questions, use zoning_districts
-- For water/drainage questions, use hydrology\n`
-      : '';
 
     // Build examples that use available layers
     const examples = this.buildExamples();
@@ -122,7 +129,11 @@ If the user asks about data we don't have (like affordable housing, roads, etc.)
 
 Available layers:
 ${layerDescriptions}
-${availabilityNote}
+
+IMPORTANT:
+- Use only layers and fields listed above.
+- Do not invent layers or fields that are not listed.
+- Do not substitute unavailable concepts with "closest alternatives".
 
 Supported operations:
 - Attribute filters: eq, neq, gt, gte, lt, lte, in, like
@@ -175,10 +186,16 @@ Output only the JSON object, no other text:`;
     // Check if referenced fields exist in layer schema
     const layerSchema = LAYER_SCHEMAS[query.selectLayer];
     if (layerSchema) {
+      const runtimeFields = this.availableLayerFields.get(query.selectLayer);
+
       // Check attribute filter fields
       if (query.attributeFilters) {
         for (const filter of query.attributeFilters) {
-          if (!(filter.field in layerSchema.fields)) {
+          const fieldExistsInSchema = filter.field in layerSchema.fields;
+          const fieldExistsAtRuntime = runtimeFields
+            ? runtimeFields.has(filter.field)
+            : true;
+          if (!fieldExistsInSchema || !fieldExistsAtRuntime) {
             confidence -= 0.1;
           }
         }
@@ -303,7 +320,7 @@ User: "Show residential zones"
 {
   "selectLayer": "zoning_districts",
   "attributeFilters": [
-    {"field": "allows_residential", "op": "eq", "value": true}
+    {"field": "zone_code", "op": "like", "value": "R%"}
   ]
 }
 
@@ -319,7 +336,7 @@ User: "Show commercial zones"
 {
   "selectLayer": "zoning_districts",
   "attributeFilters": [
-    {"field": "allows_commercial", "op": "eq", "value": true}
+    {"field": "zone_code", "op": "like", "value": "C%"}
   ]
 }`);
     }
@@ -409,23 +426,25 @@ User: "Show all arroyos"
   "selectLayer": "transit_access"
 }
 
-User: "Transit stops within 500 meters of affordable housing"
-{
-  "selectLayer": "transit_access",
-  "spatialFilters": [
-    {
-      "op": "within_distance",
-      "targetLayer": "affordable_housing_units",
-      "distance": 500
-    }
-  ]
-}
-
 User: "Show wheelchair accessible stops"
 {
   "selectLayer": "transit_access",
   "attributeFilters": [
     {"field": "wheelchair_accessible", "op": "eq", "value": true}
+  ]
+}`);
+    }
+
+    if (hasLayer('transit_access') && hasLayer('parks')) {
+      examples.push(`User: "Transit stops near parks"
+{
+  "selectLayer": "transit_access",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "parks",
+      "distance": 500
+    }
   ]
 }`);
     }
@@ -623,27 +642,6 @@ User: "Transit stops along bikeways"
 }`);
     }
 
-    // Add fallback examples for unavailable data requests
-    if (hasLayer('census_tracts')) {
-      examples.push(`User: "Show affordable housing locations"
-(Note: affordable_housing layer not available, using census_tracts with income data as alternative)
-{
-  "selectLayer": "census_tracts",
-  "attributeFilters": [
-    {"field": "median_income", "op": "lt", "value": 40000}
-  ]
-}
-
-User: "Where are the low income areas?"
-{
-  "selectLayer": "census_tracts",
-  "attributeFilters": [
-    {"field": "median_income", "op": "lt", "value": 35000}
-  ]
-}`);
-    }
-
     return examples.join('\n\n');
   }
 }
-

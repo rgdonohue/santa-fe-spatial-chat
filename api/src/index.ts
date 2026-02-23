@@ -1,13 +1,21 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
-import { existsSync, readFileSync } from 'fs';
-import layers from './routes/layers';
-import queryRoute, { setDatabase as setQueryDatabase } from './routes/query';
-import chatRoute, { setDatabase as setChatDatabase, setAvailableLayers } from './routes/chat';
-import templatesRoute from './routes/templates';
+import layers, { setLayerRegistry as setLayersRegistry } from './routes/layers';
+import queryRoute, {
+  setDatabase as setQueryDatabase,
+  setLayerRegistry as setQueryLayerRegistry,
+} from './routes/query';
+import chatRoute, {
+  setDatabase as setChatDatabase,
+  setLayerRegistry as setChatLayerRegistry,
+} from './routes/chat';
+import templatesRoute, {
+  setAvailableLayers as setTemplateAvailableLayers,
+} from './routes/templates';
 import { initDatabase } from './lib/db/init';
 import { join } from 'path';
+import { buildLayerRegistry } from './lib/layers/registry';
 
 const app = new Hono();
 
@@ -43,17 +51,15 @@ async function startServer() {
     setChatDatabase(db);
     console.log('✓ DuckDB initialized with spatial extension');
 
-    // Read manifest to get available layers
     const manifestPath = join(dataDir, 'manifest.json');
-    if (existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-        const availableLayers = Object.keys(manifest.layers || {});
-        setAvailableLayers(availableLayers);
-      } catch (e) {
-        console.warn('Could not read manifest:', e);
-      }
-    }
+    const layerRegistry = await buildLayerRegistry(db, manifestPath);
+    setLayersRegistry(layerRegistry);
+    setQueryLayerRegistry(layerRegistry);
+    setChatLayerRegistry(layerRegistry);
+    setTemplateAvailableLayers(layerRegistry.loadedLayerNames);
+    console.log(
+      `✓ Layer registry initialized (${layerRegistry.loadedLayerNames.length} loaded layers)`
+    );
 
     console.log(`Server is running on port ${port}`);
     serve({

@@ -300,8 +300,8 @@ describe('QueryBuilder', () => {
       // Should use ORDER BY distance ASC
       expect(sql).toContain('ORDER BY distance ASC');
       // Should use LIMIT with k value
-      expect(sql).toContain('LIMIT');
-      expect(params).toContain(5);
+      expect(sql).toContain('LIMIT 5');
+      expect(params).toHaveLength(0);
       // Should use projected geometry for distance calculation
       expect(sql).toContain('geom_utm13');
       // Should calculate distance
@@ -423,4 +423,3 @@ describe('QueryBuilder', () => {
     });
   });
 });
-

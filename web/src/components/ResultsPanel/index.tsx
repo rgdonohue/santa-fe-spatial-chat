@@ -1,11 +1,17 @@
 import type { Feature, Geometry } from 'geojson';
-import type { StructuredQuery } from '../../types/api';
+import type {
+  GroundingInfo,
+  QueryMetadata,
+  StructuredQuery,
+} from '../../types/api';
 import './ResultsPanel.css';
 
 interface ResultsPanelProps {
   features: Feature<Geometry, Record<string, unknown>>[];
   selectedFeature: Feature<Geometry, Record<string, unknown>> | null;
   query: StructuredQuery | null;
+  metadata: QueryMetadata | null;
+  grounding: GroundingInfo | null;
   explanation: string | null;
   onFeatureSelect: (feature: Feature<Geometry, Record<string, unknown>> | null) => void;
   onClose: () => void;
@@ -15,6 +21,8 @@ export function ResultsPanel({
   features,
   selectedFeature,
   query,
+  metadata,
+  grounding,
   explanation,
   onFeatureSelect,
   onClose,
@@ -54,6 +62,44 @@ export function ResultsPanel({
       {explanation && (
         <div className="results-explanation">
           <p>{explanation}</p>
+        </div>
+      )}
+
+      {(metadata || grounding) && (
+        <div className="results-provenance">
+          {grounding && (
+            <div className="provenance-row">
+              <span className={`grounding-badge grounding-${grounding.status}`}>
+                Grounding: {grounding.status.replace('_', ' ')}
+              </span>
+              {grounding.missingLayers.length > 0 && (
+                <span className="provenance-text">
+                  Missing: {grounding.missingLayers.join(', ')}
+                </span>
+              )}
+            </div>
+          )}
+          {metadata?.sourceLayers && metadata.sourceLayers.length > 0 && (
+            <div className="provenance-row">
+              <span className="provenance-label">Sources</span>
+              <span className="provenance-text">
+                {metadata.sourceLayers.join(', ')}
+              </span>
+            </div>
+          )}
+          {metadata?.queryHash && (
+            <div className="provenance-row">
+              <span className="provenance-label">Query hash</span>
+              <span className="provenance-text">{metadata.queryHash}</span>
+            </div>
+          )}
+          {metadata?.truncated && (
+            <div className="provenance-row">
+              <span className="provenance-warning">
+                Results truncated at {metadata.maxFeaturesApplied ?? metadata.count} features
+              </span>
+            </div>
+          )}
         </div>
       )}
 

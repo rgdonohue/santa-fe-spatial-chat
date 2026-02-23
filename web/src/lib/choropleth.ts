@@ -72,8 +72,13 @@ const CENSUS_TRACT_FIELDS: Record<string, FieldConfig> = {
     format: (v) => `$${v.toLocaleString()}`,
     unit: 'USD',
     // Breaks based on HUD income limits (% of AMI)
-    // 50% AMI (~$38k), 80% AMI (~$62k), 100% AMI (~$77k), 120% AMI (~$92k)
-    fixedBreaks: [38500, 61600, 77000, 92400],
+    // 50% AMI, 80% AMI, 100% AMI, 120% AMI
+    fixedBreaks: [
+      Math.round(SANTA_FE_AMI_2023 * 0.5),
+      Math.round(SANTA_FE_AMI_2023 * 0.8),
+      SANTA_FE_AMI_2023,
+      Math.round(SANTA_FE_AMI_2023 * 1.2),
+    ],
     classLabels: [
       'Very Low (<50% AMI)',
       'Low (50-80% AMI)',

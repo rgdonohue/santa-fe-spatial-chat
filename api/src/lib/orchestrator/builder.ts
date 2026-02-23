@@ -12,16 +12,22 @@ import type {
 } from '../../../../shared/types/query';
 import { LAYER_SCHEMAS } from '../../../../shared/types/geo';
 
+interface QueryBuilderOptions {
+  simplifyToleranceDeg?: number;
+}
+
 /**
  * Query builder that converts StructuredQuery to SQL
  */
 export class QueryBuilder {
   private query: StructuredQuery;
+  private options: QueryBuilderOptions;
   private params: unknown[] = [];
   private paramIndex = 1; // DuckDB uses $1, $2, etc.
 
-  constructor(query: StructuredQuery) {
+  constructor(query: StructuredQuery, options: QueryBuilderOptions = {}) {
     this.query = query;
+    this.options = options;
     this.validateLayer(query.selectLayer);
   }
 
@@ -114,7 +120,13 @@ export class QueryBuilder {
 
     // Always include geometry (use WGS84 for GeoJSON output)
     if (!this.query.aggregate) {
-      fields.push('ST_AsGeoJSON(geom_4326) AS geometry');
+      if (this.options.simplifyToleranceDeg && this.options.simplifyToleranceDeg > 0) {
+        fields.push(
+          `ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom_4326, ${this.options.simplifyToleranceDeg})) AS geometry`
+        );
+      } else {
+        fields.push('ST_AsGeoJSON(geom_4326) AS geometry');
+      }
     }
 
     return `SELECT ${fields.join(', ')}`;
@@ -202,8 +214,6 @@ export class QueryBuilder {
     // Choose geometry based on operation type
     const useProjected = this.requiresProjectedGeometry(filter.op);
     const sourceGeom = useProjected ? 'geom_utm13' : 'geom_4326';
-    const targetGeom = useProjected ? 'target_geom_utm13' : 'target_geom_4326';
-
     switch (filter.op) {
       case 'within_distance': {
         if (!filter.distance) {
@@ -254,7 +264,7 @@ export class QueryBuilder {
     const useProjected = this.requiresProjectedGeometry(filter.op);
     const geomField = useProjected ? 'geom_utm13' : 'geom_4326';
 
-    let subquery = `SELECT ST_Union(${geomField}) AS target_geom_${useProjected ? 'utm13' : '4326'} FROM ${targetLayer}`;
+    let subquery = `SELECT ST_Union_Agg(${geomField}) AS target_geom_${useProjected ? 'utm13' : '4326'} FROM ${targetLayer}`;
 
     // Add target filters if present
     if (filter.targetFilter && filter.targetFilter.length > 0) {
@@ -321,9 +331,7 @@ export class QueryBuilder {
     this.validateLayer(nearestFilter.targetLayer);
 
     // Build target geometry subquery
-    const useProjected = true; // Always use projected for distance calculations
     const sourceGeom = 'geom_utm13';
-    const targetGeom = 'target_geom_utm13';
     
     const targetSubquery = this.buildTargetSubquery(nearestFilter);
 
@@ -339,7 +347,7 @@ export class QueryBuilder {
     }
     
     // Add distance calculation
-    // Note: targetSubquery returns a single geometry (ST_Union), so we can use it directly
+    // Note: targetSubquery returns a single geometry (ST_Union_Agg), so we can use it directly
     fields.push(`ST_Distance(${sourceGeom}, (${targetSubquery})) AS distance`);
     fields.push('ST_AsGeoJSON(geom_4326) AS geometry');
 
@@ -386,15 +394,13 @@ export class QueryBuilder {
     parts.push(`ORDER BY distance ASC`);
 
     // LIMIT to k nearest neighbors
-    const limitParam = this.addParam(nearestFilter.limit);
-    parts.push(`LIMIT ${limitParam}`);
+    parts.push(`LIMIT ${nearestFilter.limit}`);
 
     // If query has its own limit, apply it as well (but k-NN limit takes precedence)
     if (this.query.limit !== undefined && this.query.limit < nearestFilter.limit) {
       // Use the smaller limit
       parts.pop(); // Remove k-NN limit
-      const queryLimitParam = this.addParam(this.query.limit);
-      parts.push(`LIMIT ${queryLimitParam}`);
+      parts.push(`LIMIT ${this.query.limit}`);
     }
 
     return { sql: parts.join('\n'), params: this.params };
@@ -411,4 +417,3 @@ export class QueryBuilder {
     }
   }
 }
-

@@ -3,8 +3,8 @@
  */
 
 import type { Feature, Geometry } from 'geojson';
+import type { StructuredQuery } from '../../../shared/types/query';
 
-// Re-export query types from shared
 export type {
   StructuredQuery,
   AttributeFilter,
@@ -13,11 +13,16 @@ export type {
   TemporalQuery,
 } from '../../../shared/types/query';
 
-export type { LayerSchema } from '../../../shared/types/geo';
+export interface GroundingInfo {
+  status: 'exact_match' | 'partial_match' | 'unsupported';
+  requestedConcepts: string[];
+  matchedLayers: string[];
+  missingConcepts: string[];
+  missingLayers: string[];
+  disambiguationPrompt?: string;
+  suggestions: string[];
+}
 
-/**
- * Chat message in the conversation
- */
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -26,72 +31,73 @@ export interface ChatMessage {
   query?: StructuredQuery;
   result?: QueryResult;
   metadata?: QueryMetadata;
+  grounding?: GroundingInfo;
   error?: string;
 }
 
-/**
- * Query result metadata
- */
 export interface QueryMetadata {
   count: number;
   executionTimeMs: number;
   parseTimeMs?: number;
+  queryHash?: string;
+  sourceLayers?: string[];
+  truncated?: boolean;
+  maxFeaturesApplied?: number;
+  hardCap?: number;
+  defaultLimitApplied?: boolean;
+  normalizationNotes?: string[];
   cache?: {
     parseHit: boolean;
     queryHit: boolean;
   };
 }
 
-/**
- * Query result from the API (GeoJSON FeatureCollection)
- */
 export interface QueryResult {
   type: 'FeatureCollection';
   features: Feature<Geometry, Record<string, unknown>>[];
+  metadata?: QueryMetadata;
 }
 
-/**
- * Chat API request
- */
 export interface ChatRequest {
   message: string;
   conversationId?: string;
 }
 
-/**
- * Chat API response
- */
 export interface ChatResponse {
   query: StructuredQuery;
   result: QueryResult;
   explanation: string;
   confidence: number;
+  grounding: GroundingInfo;
   metadata: QueryMetadata;
   suggestions?: string[];
 }
 
-/**
- * Query API request (direct structured query)
- */
 export interface QueryRequest {
   query: StructuredQuery;
 }
 
-/**
- * Layers API response
- */
-export interface LayersResponse {
-  layers: Record<string, LayerSchema>;
+export interface LayerSummary {
+  name: string;
+  geometryType: string;
+  schemaFields: string[];
+  isLoaded: boolean;
+  loadedFields: string[];
+  featureCount: number | null;
+  description?: string;
 }
 
-/**
- * API error response
- */
+export interface LayersResponse {
+  layers: LayerSummary[];
+  count: number;
+  loadedCount: number;
+  generatedAt?: string;
+}
+
 export interface ApiError {
   error: string;
   details?: string;
+  message?: string;
+  suggestions?: string[];
+  grounding?: GroundingInfo;
 }
-
-// Import StructuredQuery type for use in this file
-import type { StructuredQuery } from '../../../shared/types/query';
-import type { LayerSchema } from '../../../shared/types/geo';

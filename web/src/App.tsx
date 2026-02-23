@@ -5,7 +5,12 @@ import { MapView } from './components/MapView';
 import { ResultsPanel } from './components/ResultsPanel';
 import { sendChatMessage, ApiClientError } from './lib/api';
 import { getChoroplethConfig } from './lib/choropleth';
-import type { ChatMessage, StructuredQuery } from './types/api';
+import type {
+  ChatMessage,
+  GroundingInfo,
+  QueryMetadata,
+  StructuredQuery,
+} from './types/api';
 import './App.css';
 
 function App() {
@@ -21,6 +26,8 @@ function App() {
   const [currentQuery, setCurrentQuery] = useState<StructuredQuery | null>(
     null
   );
+  const [queryMetadata, setQueryMetadata] = useState<QueryMetadata | null>(null);
+  const [grounding, setGrounding] = useState<GroundingInfo | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
 
@@ -48,11 +55,14 @@ function App() {
         query: response.query,
         result: response.result,
         metadata: response.metadata,
+        grounding: response.grounding,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
       setFeatures(response.result.features);
       setCurrentQuery(response.query);
+      setQueryMetadata(response.metadata);
+      setGrounding(response.grounding);
       setExplanation(response.explanation);
       setShowResults(true);
       setSelectedFeature(null);
@@ -77,6 +87,7 @@ function App() {
         role: 'assistant',
         content,
         timestamp: new Date(),
+        grounding: error instanceof ApiClientError ? error.grounding : undefined,
         error: errorMessage || undefined,
       };
 
@@ -132,6 +143,7 @@ function App() {
           selectedFeature={selectedFeature}
           onFeatureClick={handleFeatureClick}
           choroplethConfig={choroplethConfig}
+          queryLayerName={currentQuery?.selectLayer ?? null}
         />
       </main>
       {showResults && (
@@ -140,6 +152,8 @@ function App() {
             features={features}
             selectedFeature={selectedFeature}
             query={currentQuery}
+            metadata={queryMetadata}
+            grounding={grounding}
             explanation={explanation}
             onFeatureSelect={handleFeatureSelect}
             onClose={handleCloseResults}

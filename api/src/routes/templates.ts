@@ -7,13 +7,31 @@
 import { Hono } from 'hono';
 import {
   EQUITY_TEMPLATES,
+  getAvailableTemplates,
   getTemplateById,
   getTemplatesByCategory,
-  getTemplatesGrouped,
 } from '../lib/templates/equity-queries';
 import type { QueryTemplate } from '../lib/templates/equity-queries';
 
 const templatesRoute = new Hono();
+let availableLayers: string[] = [];
+
+export function setAvailableLayers(layers: string[]): void {
+  availableLayers = [...layers];
+}
+
+function groupTemplates(
+  templates: QueryTemplate[]
+): Record<string, QueryTemplate[]> {
+  return templates.reduce<Record<string, QueryTemplate[]>>((acc, template) => {
+    const category = template.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category]?.push(template);
+    return acc;
+  }, {});
+}
 
 /**
  * GET /api/templates
@@ -21,26 +39,37 @@ const templatesRoute = new Hono();
  */
 templatesRoute.get('/', (c) => {
   const grouped = c.req.query('grouped') === 'true';
+  const includeUnavailable = c.req.query('includeUnavailable') === 'true';
+  const templateList =
+    includeUnavailable || availableLayers.length === 0
+      ? EQUITY_TEMPLATES
+      : getAvailableTemplates(availableLayers);
 
   if (grouped) {
     return c.json({
-      templates: getTemplatesGrouped(),
-      count: EQUITY_TEMPLATES.length,
+      templates: groupTemplates(templateList),
+      count: templateList.length,
+      availableCount:
+        availableLayers.length === 0
+          ? EQUITY_TEMPLATES.length
+          : getAvailableTemplates(availableLayers).length,
     });
   }
 
   // Return simplified list for UI
-  const templates = EQUITY_TEMPLATES.map((t) => ({
+  const templates = templateList.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
     category: t.category,
     dataRequirements: t.dataRequirements,
+    runnable: t.dataRequirements.every((req) => availableLayers.includes(req)),
   }));
 
   return c.json({
     templates,
     count: templates.length,
+    includeUnavailable,
   });
 });
 
@@ -59,6 +88,24 @@ templatesRoute.get('/:id', (c) => {
         available: EQUITY_TEMPLATES.map((t) => t.id),
       },
       404
+    );
+  }
+
+  const runnable = template.dataRequirements.every((req) =>
+    availableLayers.includes(req)
+  );
+  if (!runnable && availableLayers.length > 0) {
+    const missing = template.dataRequirements.filter(
+      (layer) => !availableLayers.includes(layer)
+    );
+    return c.json(
+      {
+        error: 'Template unavailable for current data',
+        template: template.id,
+        missingLayers: missing,
+        availableLayers,
+      },
+      409
     );
   }
 
@@ -90,11 +137,17 @@ templatesRoute.get('/category/:category', (c) => {
   }
 
   const templates = getTemplatesByCategory(category);
+  const filteredTemplates =
+    availableLayers.length === 0
+      ? templates
+      : templates.filter((template) =>
+          template.dataRequirements.every((req) => availableLayers.includes(req))
+        );
 
   return c.json({
     category,
-    templates,
-    count: templates.length,
+    templates: filteredTemplates,
+    count: filteredTemplates.length,
   });
 });
 

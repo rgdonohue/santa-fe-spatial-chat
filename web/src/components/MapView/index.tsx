@@ -11,14 +11,19 @@ interface MapViewProps {
   selectedFeature: Feature<Geometry, Record<string, unknown>> | null;
   onFeatureClick: (feature: Feature<Geometry, Record<string, unknown>>) => void;
   choroplethConfig?: ChoroplethConfig | null;
+  queryLayerName?: string | null;
 }
 
 const RESULTS_SOURCE = 'query-results';
 const RESULTS_FILL_LAYER = 'query-results-fill';
 const RESULTS_LINE_LAYER = 'query-results-line';
+const RESULTS_LINESTRING_LAYER = 'query-results-linestring';
 const RESULTS_POINT_LAYER = 'query-results-point';
 const SELECTED_SOURCE = 'selected-feature';
-const SELECTED_LAYER = 'selected-feature-layer';
+const SELECTED_POLYGON_FILL_LAYER = 'selected-feature-polygon-fill';
+const SELECTED_POLYGON_LINE_LAYER = 'selected-feature-polygon-line';
+const SELECTED_LINE_LAYER = 'selected-feature-line';
+const SELECTED_POINT_LAYER = 'selected-feature-point';
 
 // Steelblue color for all features
 const FILL_COLOR = '#4682b4';
@@ -53,6 +58,7 @@ export function MapView({
   selectedFeature,
   onFeatureClick,
   choroplethConfig,
+  queryLayerName,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -135,7 +141,7 @@ export function MapView({
 
       // Line layer for LineString features (hydrology, etc.) - steelblue
       m.addLayer({
-        id: 'query-results-linestring',
+        id: RESULTS_LINESTRING_LAYER,
         type: 'line',
         source: RESULTS_SOURCE,
         filter: ['==', ['geometry-type'], 'LineString'],
@@ -159,14 +165,51 @@ export function MapView({
         },
       });
 
-      // Selected feature highlight layer
+      // Selected feature highlight layers by geometry type
       m.addLayer({
-        id: SELECTED_LAYER,
+        id: SELECTED_POLYGON_FILL_LAYER,
+        type: 'fill',
+        source: SELECTED_SOURCE,
+        filter: ['==', ['geometry-type'], 'Polygon'],
+        paint: {
+          'fill-color': '#f59e0b',
+          'fill-opacity': 0.22,
+        },
+      });
+
+      m.addLayer({
+        id: SELECTED_POLYGON_LINE_LAYER,
         type: 'line',
         source: SELECTED_SOURCE,
+        filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
           'line-color': '#f59e0b',
           'line-width': 4,
+        },
+      });
+
+      m.addLayer({
+        id: SELECTED_LINE_LAYER,
+        type: 'line',
+        source: SELECTED_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': '#f59e0b',
+          'line-width': 4,
+        },
+      });
+
+      m.addLayer({
+        id: SELECTED_POINT_LAYER,
+        type: 'circle',
+        source: SELECTED_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#f59e0b',
+          'circle-opacity': 0.3,
+          'circle-stroke-color': '#b45309',
+          'circle-stroke-width': 3,
         },
       });
     });
@@ -177,7 +220,12 @@ export function MapView({
       if (!m) return;
 
       const clickedFeatures = m.queryRenderedFeatures(e.point, {
-        layers: [RESULTS_FILL_LAYER, RESULTS_LINE_LAYER, 'query-results-linestring', RESULTS_POINT_LAYER],
+        layers: [
+          RESULTS_FILL_LAYER,
+          RESULTS_LINE_LAYER,
+          RESULTS_LINESTRING_LAYER,
+          RESULTS_POINT_LAYER,
+        ],
       });
 
       if (clickedFeatures.length > 0) {
@@ -241,11 +289,11 @@ export function MapView({
 
     map.current.on('mousemove', RESULTS_FILL_LAYER, handleMouseMove);
     map.current.on('mousemove', RESULTS_LINE_LAYER, handleMouseMove);
-    map.current.on('mousemove', 'query-results-linestring', handleMouseMove);
+    map.current.on('mousemove', RESULTS_LINESTRING_LAYER, handleMouseMove);
     map.current.on('mousemove', RESULTS_POINT_LAYER, handleMouseMove);
     map.current.on('mouseleave', RESULTS_FILL_LAYER, handleMouseLeave);
     map.current.on('mouseleave', RESULTS_LINE_LAYER, handleMouseLeave);
-    map.current.on('mouseleave', 'query-results-linestring', handleMouseLeave);
+    map.current.on('mouseleave', RESULTS_LINESTRING_LAYER, handleMouseLeave);
     map.current.on('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
 
     return () => {
@@ -255,11 +303,11 @@ export function MapView({
         m.off('click', handleClick);
         m.off('mousemove', RESULTS_FILL_LAYER, handleMouseMove);
         m.off('mousemove', RESULTS_LINE_LAYER, handleMouseMove);
-        m.off('mousemove', 'query-results-linestring', handleMouseMove);
+        m.off('mousemove', RESULTS_LINESTRING_LAYER, handleMouseMove);
         m.off('mousemove', RESULTS_POINT_LAYER, handleMouseMove);
         m.off('mouseleave', RESULTS_FILL_LAYER, handleMouseLeave);
         m.off('mouseleave', RESULTS_LINE_LAYER, handleMouseLeave);
-        m.off('mouseleave', 'query-results-linestring', handleMouseLeave);
+        m.off('mouseleave', RESULTS_LINESTRING_LAYER, handleMouseLeave);
         m.off('mouseleave', RESULTS_POINT_LAYER, handleMouseLeave);
       }
       popup.current?.remove();
@@ -362,7 +410,10 @@ export function MapView({
       <div ref={mapContainer} className="map-container" />
       {choroplethConfig && (
         <div className="map-legend">
-          <div className="legend-title">{choroplethConfig.label}</div>
+          <div className="legend-title">
+            {choroplethConfig.label}
+            {choroplethConfig.unit ? ` (${choroplethConfig.unit})` : ''}
+          </div>
           <div className="legend-scale">
             {choroplethConfig.colorRamp.map((color, i) => {
               const label = choroplethConfig.classLabels[i] || '';
@@ -373,6 +424,22 @@ export function MapView({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+      {!choroplethConfig && features.length > 0 && (
+        <div className="map-legend">
+          <div className="legend-title">Query Results</div>
+          <div className="legend-scale">
+            <div className="legend-item">
+              <span className="legend-color" style={{ backgroundColor: FILL_COLOR }} />
+              <span className="legend-label">
+                {queryLayerName || 'Selected layer'} ({getDominantGeometry(features)})
+              </span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-label">{features.length.toLocaleString()} features</span>
+            </div>
           </div>
         </div>
       )}
@@ -428,3 +495,27 @@ function getBounds(
   return [[minLng, minLat], [maxLng, maxLat]];
 }
 
+function getDominantGeometry(
+  features: Feature<Geometry, Record<string, unknown>>[]
+): string {
+  if (features.length === 0) {
+    return 'Unknown';
+  }
+
+  const counts = new Map<string, number>();
+  for (const feature of features) {
+    const geometryType = feature.geometry.type;
+    counts.set(geometryType, (counts.get(geometryType) ?? 0) + 1);
+  }
+
+  let dominant = 'Unknown';
+  let maxCount = -1;
+  for (const [geometryType, count] of counts.entries()) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominant = geometryType;
+    }
+  }
+
+  return dominant;
+}

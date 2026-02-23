@@ -7,7 +7,7 @@ import type {
   ChatResponse,
   QueryRequest,
   LayersResponse,
-  ApiError,
+  GroundingInfo,
   QueryResult,
   StructuredQuery,
 } from '../types/api';
@@ -18,14 +18,24 @@ const API_BASE = 'http://localhost:3000';
  * Custom error class for API errors
  */
 export class ApiClientError extends Error {
+  statusCode: number;
+  details?: string;
+  suggestions?: string[];
+  grounding?: GroundingInfo;
+
   constructor(
     message: string,
-    public statusCode: number,
-    public details?: string,
-    public suggestions?: string[]
+    statusCode: number,
+    details?: string,
+    suggestions?: string[],
+    grounding?: GroundingInfo
   ) {
     super(message);
     this.name = 'ApiClientError';
+    this.statusCode = statusCode;
+    this.details = details;
+    this.suggestions = suggestions;
+    this.grounding = grounding;
   }
 }
 
@@ -51,6 +61,7 @@ async function apiFetch<T>(
       let errorMessage = `API error: ${response.status}`;
       let details: string | undefined;
       let suggestions: string[] | undefined;
+      let grounding: GroundingInfo | undefined;
 
       try {
         const errorBody = (await response.json()) as Record<string, unknown>;
@@ -59,11 +70,18 @@ async function apiFetch<T>(
         details = (errorBody.message as string) ?? (errorBody.details as string);
         // API may return suggestions for how to fix the query
         suggestions = errorBody.suggestions as string[] | undefined;
+        grounding = errorBody.grounding as GroundingInfo | undefined;
       } catch {
         // Ignore JSON parse errors for error response
       }
 
-      throw new ApiClientError(errorMessage, response.status, details, suggestions);
+      throw new ApiClientError(
+        errorMessage,
+        response.status,
+        details,
+        suggestions,
+        grounding
+      );
     }
 
     return (await response.json()) as T;
