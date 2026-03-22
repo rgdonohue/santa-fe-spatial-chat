@@ -35,6 +35,29 @@
   border-radius: 12px;
 }
 
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.export-btn {
+  background: transparent;
+  border: 1px solid var(--border-color, #2a2a4a);
+  color: var(--text-secondary, #888);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.export-btn:hover {
+  color: var(--text-primary, #fff);
+  border-color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.1);
+}
+
 .results-close-btn {
   background: transparent;
   border: none;

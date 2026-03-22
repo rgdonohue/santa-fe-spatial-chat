@@ -1,4 +1,5 @@
-import type { Feature, Geometry } from 'geojson';
+import { useCallback } from 'react';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type {
   GroundingInfo,
   QueryMetadata,
@@ -17,6 +18,64 @@ interface ResultsPanelProps {
   onClose: () => void;
 }
 
+function downloadBlob(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function featuresToGeoJSON(
+  features: Feature<Geometry, Record<string, unknown>>[],
+  query: StructuredQuery | null,
+  metadata: QueryMetadata | null
+): string {
+  const fc: FeatureCollection & { metadata?: Record<string, unknown> } = {
+    type: 'FeatureCollection',
+    features,
+    metadata: {
+      exportedAt: new Date().toISOString(),
+      query: query ?? undefined,
+      queryHash: metadata?.queryHash,
+      sourceLayers: metadata?.sourceLayers,
+      featureCount: features.length,
+    },
+  };
+  return JSON.stringify(fc, null, 2);
+}
+
+function featuresToCSV(
+  features: Feature<Geometry, Record<string, unknown>>[]
+): string {
+  if (features.length === 0) return '';
+
+  const allKeys = new Set<string>();
+  for (const f of features) {
+    for (const key of Object.keys(f.properties ?? {})) {
+      allKeys.add(key);
+    }
+  }
+  const headers = Array.from(allKeys).sort();
+
+  const escapeCSV = (val: unknown): string => {
+    if (val === null || val === undefined) return '';
+    const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const rows = features.map((f) =>
+    headers.map((h) => escapeCSV(f.properties?.[h])).join(',')
+  );
+
+  return [headers.join(','), ...rows].join('\n');
+}
+
 export function ResultsPanel({
   features,
   selectedFeature,
@@ -27,6 +86,18 @@ export function ResultsPanel({
   onFeatureSelect,
   onClose,
 }: ResultsPanelProps) {
+  const layerName = query?.selectLayer ?? 'results';
+
+  const handleExportGeoJSON = useCallback(() => {
+    const content = featuresToGeoJSON(features, query, metadata);
+    downloadBlob(content, `${layerName}.geojson`, 'application/geo+json');
+  }, [features, query, metadata, layerName]);
+
+  const handleExportCSV = useCallback(() => {
+    const content = featuresToCSV(features);
+    downloadBlob(content, `${layerName}.csv`, 'text/csv');
+  }, [features, layerName]);
+
   if (features.length === 0 && !query) {
     return null;
   }
@@ -49,14 +120,38 @@ export function ResultsPanel({
           <h3>Results</h3>
           <span className="results-count">{features.length} features</span>
         </div>
-        <button
-          type="button"
-          className="results-close-btn"
-          onClick={onClose}
-          aria-label="Close results"
-        >
-          &times;
-        </button>
+        <div className="results-actions">
+          {features.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="export-btn"
+                onClick={handleExportGeoJSON}
+                aria-label="Download results as GeoJSON"
+                title="Download GeoJSON"
+              >
+                GeoJSON
+              </button>
+              <button
+                type="button"
+                className="export-btn"
+                onClick={handleExportCSV}
+                aria-label="Download results as CSV"
+                title="Download CSV"
+              >
+                CSV
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="results-close-btn"
+            onClick={onClose}
+            aria-label="Close results"
+          >
+            &times;
+          </button>
+        </div>
       </div>
 
       {explanation && (
