@@ -144,7 +144,7 @@ async function loadParquetLayer(
             return;
           }
 
-          // Get row count
+          // Get row count, then create spatial indexes
           conn.all(
             `SELECT COUNT(*) as count FROM "${layerName}"`,
             (countErr: DuckDbError | null, rows: unknown[]) => {
@@ -154,13 +154,52 @@ async function loadParquetLayer(
               }
               const count = (rows[0] as { count: number }).count;
               console.log(`    ${count} features`);
-              resolve();
+
+              // Create spatial indexes for faster spatial queries
+              createSpatialIndexes(conn, layerName)
+                .then(() => resolve())
+                .catch((indexErr) => {
+                  console.warn(`    Warning: spatial index creation failed for ${layerName}:`, indexErr);
+                  resolve(); // Still consider layer loaded even if indexes fail
+                });
             }
           );
         });
       }
     );
   });
+}
+
+/**
+ * Create R-tree spatial indexes on both geometry columns for a layer.
+ * Indexes significantly improve spatial join performance on large tables.
+ */
+async function createSpatialIndexes(
+  conn: Connection,
+  layerName: string
+): Promise<void> {
+  const indexes = [
+    { col: 'geom_4326', suffix: 'geo' },
+    { col: 'geom_utm13', suffix: 'utm' },
+  ];
+
+  for (const { col, suffix } of indexes) {
+    await new Promise<void>((resolve, reject) => {
+      const indexName = `idx_${layerName}_${suffix}`;
+      conn.exec(
+        `CREATE INDEX "${indexName}" ON "${layerName}" USING RTREE ("${col}")`,
+        (err: DuckDbError | null) => {
+          if (err) {
+            // Some geometry types may not support RTREE; log and continue
+            console.warn(`    Index ${indexName} skipped: ${err.message}`);
+            resolve();
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
 }
 
 /**

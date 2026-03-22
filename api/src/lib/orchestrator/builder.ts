@@ -12,6 +12,19 @@ import type {
 } from '../../../../shared/types/query';
 import { LAYER_SCHEMAS } from '../../../../shared/types/geo';
 
+/**
+ * Fields stored as VARCHAR in DuckDB that may need numeric casting for comparisons.
+ * When the LLM generates numeric filters (gt, lt, gte, lte) against these fields,
+ * the builder wraps them with TRY_CAST(field AS DOUBLE) to avoid type errors.
+ */
+const VARCHAR_NUMERIC_FIELDS: Record<string, Set<string>> = {
+  parcels: new Set(['year_built']),
+  short_term_rentals: new Set(['accommodates', 'price_per_night', 'availability_365']),
+  transit_access: new Set(['avg_headway_minutes']),
+  parks: new Set(['trail_miles']),
+  bikeways: new Set(['length_miles']),
+};
+
 interface QueryBuilderOptions {
   simplifyToleranceDeg?: number;
 }
@@ -168,10 +181,30 @@ export class QueryBuilder {
   }
 
   /**
-   * Build attribute filter condition
+   * Check if a field needs numeric casting (VARCHAR stored as number in DuckDB)
+   */
+  private needsNumericCast(fieldName: string): boolean {
+    const layerFields = VARCHAR_NUMERIC_FIELDS[this.query.selectLayer];
+    return layerFields?.has(fieldName) ?? false;
+  }
+
+  /**
+   * Build attribute filter condition.
+   * For numeric comparisons (gt, gte, lt, lte) against VARCHAR fields,
+   * wraps with TRY_CAST to avoid DuckDB type errors.
    */
   private buildAttributeCondition(filter: AttributeFilter): string {
-    const field = this.escapeIdentifier(filter.field);
+    const rawField = this.escapeIdentifier(filter.field);
+    const isNumericOp = ['gt', 'gte', 'lt', 'lte'].includes(filter.op);
+    const castNeeded = isNumericOp && this.needsNumericCast(filter.field);
+    const field = castNeeded ? `TRY_CAST(${rawField} AS DOUBLE)` : rawField;
+
+    // For 'in' with array values, add individual params instead of the array
+    if (filter.op === 'in' && Array.isArray(filter.value)) {
+      const params = filter.value.map((v) => this.addParam(v));
+      return `${field} IN (${params.join(', ')})`;
+    }
+
     const param = this.addParam(filter.value);
 
     switch (filter.op) {
@@ -188,13 +221,10 @@ export class QueryBuilder {
       case 'lte':
         return `${field} <= ${param}`;
       case 'in':
-        if (Array.isArray(filter.value)) {
-          const params = filter.value.map((v) => this.addParam(v));
-          return `${field} IN (${params.join(', ')})`;
-        }
+        // Non-array fallback (single value)
         return `${field} = ${param}`;
       case 'like':
-        return `${field} LIKE ${param}`;
+        return `${rawField} LIKE ${param}`; // LIKE always uses raw string field
       default:
         throw new Error(`Unsupported attribute operation: ${filter.op}`);
     }

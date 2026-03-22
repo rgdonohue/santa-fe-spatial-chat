@@ -5,38 +5,32 @@
  */
 
 import { Hono } from 'hono';
-import { OllamaClient } from '../lib/llm';
+import { createLLMClient } from '../lib/llm';
 import { IntentParser } from '../lib/orchestrator/parser';
-import { QueryBuilder } from '../lib/orchestrator/builder';
-import { getConnection, query } from '../lib/db/init';
 import {
   parseCache,
-  queryCache,
   getCacheStats,
 } from '../lib/cache';
 import type { LayerRegistry } from '../lib/layers/registry';
 import type { Database } from 'duckdb';
-import type { ParseResult } from '../lib/orchestrator/parser';
-import type { FeatureCollection } from 'geojson';
+import type { ParseResult, ConversationContext } from '../lib/orchestrator/parser';
 import type { StructuredQuery } from '../../../shared/types/query';
 import {
-  applyQueryLimits,
-  getQueryHash,
   getQuerySourceLayers,
-  normalizeStructuredQuery,
-  validateQueryAgainstRegistry,
 } from '../lib/orchestrator/query-grounding';
 import {
   assessGroundingRequest,
   type GroundingAssessment,
 } from '../lib/orchestrator/intent-router';
+import { prepareQuery, executeQuery } from '../lib/utils/query-executor';
+import { generateExplanation, generateEquityExplanation } from '../lib/utils/explanation';
 
 let dbInstance: Database | null = null;
 let layerRegistry: LayerRegistry | null = null;
 
 const chatRoute = new Hono();
 
-const llmClient = new OllamaClient();
+const llmClient = createLLMClient();
 const parser = new IntentParser(llmClient);
 
 export function setDatabase(db: Database): void {
@@ -54,133 +48,23 @@ export function setLayerRegistry(registry: LayerRegistry): void {
   console.log(`  Parser configured with layers: ${registry.loadedLayerNames.join(', ')}`);
 }
 
-function convertBigInts(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'bigint') {
-      result[key] = Number.isSafeInteger(Number(value))
-        ? Number(value)
-        : value.toString();
-    } else if (
-      typeof value === 'string' &&
-      (key === 'route_ids' || key === 'route_names' || key === 'restrictions')
-    ) {
-      try {
-        const parsed = JSON.parse(value);
-        result[key] = Array.isArray(parsed) ? parsed : value;
-      } catch {
-        result[key] = value;
-      }
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-function rowToFeature(row: Record<string, unknown>): GeoJSON.Feature {
-  const { geometry, ...properties } = row;
-
-  let geom: GeoJSON.Geometry;
-  if (typeof geometry === 'string') {
-    geom = JSON.parse(geometry) as GeoJSON.Geometry;
-  } else if (typeof geometry === 'object' && geometry !== null) {
-    geom = geometry as GeoJSON.Geometry;
-  } else {
-    throw new Error('Invalid geometry in result');
-  }
-
-  return {
-    type: 'Feature',
-    geometry: geom,
-    properties: convertBigInts(properties),
-  };
-}
-
-function generateExplanation(query: StructuredQuery, count: number): string {
-  const layerNames: Record<string, string> = {
-    parcels: 'parcels',
-    building_footprints: 'buildings',
-    short_term_rentals: 'short-term rentals',
-    transit_access: 'transit stops',
-    zoning_districts: 'zoning districts',
-    census_tracts: 'census tracts',
-    hydrology: 'water features',
-    flood_zones: 'flood zones',
-    neighborhoods: 'neighborhoods',
-    parks: 'parks',
-    bikeways: 'bikeways',
-    historic_districts: 'historic districts',
-    city_limits: 'city limits',
-  };
-
-  const attributeParts: string[] = [];
-  const spatialParts: string[] = [];
-  const layerName = layerNames[query.selectLayer] || query.selectLayer;
-
-  if (query.attributeFilters && query.attributeFilters.length > 0) {
-    const opNames: Record<string, string> = {
-      eq: 'equal to',
-      neq: 'not equal to',
-      gt: 'greater than',
-      gte: 'at least',
-      lt: 'less than',
-      lte: 'at most',
-      like: 'matching',
-      in: 'in',
-    };
-
-    for (const filter of query.attributeFilters) {
-      attributeParts.push(
-        `${filter.field.replace(/_/g, ' ')} ${opNames[filter.op] || filter.op} ${filter.value}`
-      );
-    }
-  }
-
-  if (query.spatialFilters && query.spatialFilters.length > 0) {
-    for (const filter of query.spatialFilters) {
-      const targetName = layerNames[filter.targetLayer] || filter.targetLayer;
-      if (filter.op === 'within_distance') {
-        spatialParts.push(`within ${filter.distance}m of ${targetName}`);
-      } else if (filter.op === 'nearest') {
-        spatialParts.push(`nearest ${filter.limit} to ${targetName}`);
-      } else {
-        spatialParts.push(`${filter.op} ${targetName}`);
-      }
-    }
-  }
-
-  const segments: string[] = [];
-  if (attributeParts.length > 0) {
-    const attributeLogic = (query.attributeLogic ?? 'and').toUpperCase();
-    segments.push(attributeParts.join(` ${attributeLogic} `));
-  }
-  if (spatialParts.length > 0) {
-    const spatialLogic = (query.spatialLogic ?? 'and').toUpperCase();
-    segments.push(spatialParts.join(` ${spatialLogic} `));
-  }
-
-  if (segments.length === 0) {
-    return `Found ${count} ${layerName}.`;
-  }
-
-  return `Found ${count} ${layerName} where ${segments.join(' AND ')}.`;
-}
-
 function generateDynamicSuggestions(availableLayers: string[]): string[] {
   const suggestions: string[] = [];
 
-  if (availableLayers.includes('parcels')) {
-    suggestions.push('Try: "Show parcels with assessed value over 500000"');
+  if (availableLayers.includes('short_term_rentals') && availableLayers.includes('neighborhoods')) {
+    suggestions.push('Try: "Which neighborhoods have the most short-term rentals?"');
   }
-  if (availableLayers.includes('zoning_districts')) {
-    suggestions.push('Try: "Show zoning districts with zone_code like R%"');
+  if (availableLayers.includes('parcels') && availableLayers.includes('transit_access')) {
+    suggestions.push('Try: "Show residential parcels within 300m of a bus stop"');
   }
   if (availableLayers.includes('census_tracts')) {
-    suggestions.push('Try: "Show census tracts with median income below 50000"');
+    suggestions.push('Try: "Census tracts where median income is below 40000"');
   }
-  if (availableLayers.includes('hydrology')) {
-    suggestions.push('Try: "Parcels within 200 meters of hydrology"');
+  if (availableLayers.includes('parcels') && availableLayers.includes('flood_zones')) {
+    suggestions.push('Try: "Parcels that intersect flood zones"');
+  }
+  if (availableLayers.includes('parcels')) {
+    suggestions.push('Try: "Show parcels built after 2010 with assessed value over 500000"');
   }
 
   if (suggestions.length === 0) {
@@ -231,11 +115,15 @@ chatRoute.post('/', async (c) => {
   }
 
   try {
-    const body = (await c.req.json()) as { message: string };
+    const body = (await c.req.json()) as {
+      message: string;
+      context?: ConversationContext;
+    };
     if (!body.message || typeof body.message !== 'string') {
       return c.json({ error: 'Missing or invalid message field' }, 400);
     }
 
+    const conversationContext = body.context ?? null;
     const availableLayers = layerRegistry.loadedLayerNames;
     const grounding = assessGroundingRequest(body.message, availableLayers);
     if (grounding.disambiguationPrompt) {
@@ -253,6 +141,7 @@ chatRoute.post('/', async (c) => {
       return c.json(unsupportedResponse(grounding, availableLayers), 400);
     }
 
+    // --- LLM parsing (with cache) ---
     let parseResult: ParseResult;
     let parseTimeMs = 0;
     let parseCacheHit = false;
@@ -264,17 +153,17 @@ chatRoute.post('/', async (c) => {
     } else {
       try {
         const parseStart = performance.now();
-        parseResult = await parser.parse(body.message);
+        parseResult = await parser.parse(body.message, conversationContext);
         parseTimeMs = performance.now() - parseStart;
         parseCache.set(body.message, parseResult);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown parsing error';
-        if (errorMessage.includes('Cannot connect to Ollama')) {
+        if (errorMessage.includes('Cannot connect to Ollama') || errorMessage.includes('timed out')) {
           return c.json(
             {
               error: 'LLM service unavailable',
-              message: 'Cannot connect to Ollama. Is it running?',
+              message: errorMessage,
               grounding,
               suggestions: [
                 'Make sure Ollama is installed and running',
@@ -297,76 +186,62 @@ chatRoute.post('/', async (c) => {
       }
     }
 
-    const normalized = normalizeStructuredQuery(parseResult.query);
-    const validationIssues = validateQueryAgainstRegistry(
-      normalized.query,
-      layerRegistry
-    );
-    if (validationIssues.length > 0) {
-      return c.json(
-        {
-          error: 'Parsed query does not match loaded data',
-          details: validationIssues,
-          grounding,
-          normalizationNotes: normalized.notes,
-          suggestions: generateDynamicSuggestions(availableLayers),
-        },
-        400
+    // --- Shared prepare + execute pipeline ---
+    let prepared;
+    try {
+      prepared = prepareQuery(parseResult.query, layerRegistry);
+    } catch (err) {
+      const prepErr = err as Error & { validationIssues?: string[]; normalizationNotes?: string[] };
+      if (prepErr.validationIssues) {
+        return c.json(
+          {
+            error: 'Parsed query does not match loaded data',
+            details: prepErr.validationIssues,
+            grounding,
+            normalizationNotes: prepErr.normalizationNotes ?? [],
+            suggestions: generateDynamicSuggestions(availableLayers),
+          },
+          400
+        );
+      }
+      throw err;
+    }
+
+    const { result, executionTimeMs, queryCacheHit } = await executeQuery(prepared, dbInstance);
+
+    const explanation = generateExplanation(prepared.executableQuery, result.features.length);
+
+    // Fire equity explanation in parallel — don't block the response if it fails
+    let equityNarrative: string | null = null;
+    try {
+      const equity = await generateEquityExplanation(
+        llmClient,
+        prepared.executableQuery,
+        result.features.length
       );
+      equityNarrative = equity.equityNarrative;
+    } catch {
+      // Graceful degradation — equity narrative is optional
     }
-
-    const limitApplication = applyQueryLimits(normalized.query, layerRegistry);
-    const executableQuery = limitApplication.query;
-    const queryHash = getQueryHash(executableQuery);
-
-    const cachedResult = queryCache.get(queryHash);
-    let queryCacheHit = false;
-    let result: FeatureCollection;
-    let executionTimeMs = 0;
-
-    if (cachedResult) {
-      result = cachedResult.result;
-      executionTimeMs = cachedResult.executionTimeMs;
-      queryCacheHit = true;
-    } else {
-      const builder = new QueryBuilder(executableQuery, {
-        simplifyToleranceDeg: limitApplication.simplifyToleranceDeg,
-      });
-      const { sql, params } = builder.build();
-
-      const start = performance.now();
-      const conn = await getConnection(dbInstance);
-      const rows = await query<Record<string, unknown>>(conn, sql, ...params);
-      executionTimeMs = performance.now() - start;
-
-      const features = rows.map(rowToFeature);
-      result = {
-        type: 'FeatureCollection',
-        features,
-      };
-
-      queryCache.set(queryHash, { result, executionTimeMs });
-    }
-
-    const explanation = generateExplanation(executableQuery, result.features.length);
 
     return c.json({
-      query: executableQuery,
+      query: prepared.executableQuery,
       result,
       explanation,
+      equityNarrative,
       confidence: parseResult.confidence,
       grounding,
       metadata: {
         count: result.features.length,
         executionTimeMs: Math.round(executionTimeMs * 100) / 100,
         parseTimeMs: Math.round(parseTimeMs * 100) / 100,
-        queryHash,
-        sourceLayers: getQuerySourceLayers(executableQuery),
-        truncated: limitApplication.truncated,
-        maxFeaturesApplied: limitApplication.maxFeaturesApplied,
-        hardCap: limitApplication.hardCap,
-        defaultLimitApplied: limitApplication.defaultLimitApplied,
-        normalizationNotes: normalized.notes,
+        queryHash: prepared.queryHash,
+        sourceLayers: getQuerySourceLayers(prepared.executableQuery),
+        truncated: prepared.truncated,
+        maxFeaturesApplied: prepared.maxFeaturesApplied,
+        hardCap: prepared.hardCap,
+        defaultLimitApplied: prepared.defaultLimitApplied,
+        normalizationNotes: prepared.normalizationNotes,
         cache: {
           parseHit: parseCacheHit,
           queryHit: queryCacheHit,

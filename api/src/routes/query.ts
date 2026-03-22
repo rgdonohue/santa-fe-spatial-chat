@@ -7,19 +7,9 @@
 
 import { Hono } from 'hono';
 import { validateQuery } from '../lib/orchestrator/validator';
-import { QueryBuilder } from '../lib/orchestrator/builder';
-import { getConnection, query } from '../lib/db/init';
 import type { LayerRegistry } from '../lib/layers/registry';
-import {
-  applyQueryLimits,
-  getQueryHash,
-  getQuerySourceLayers,
-  normalizeStructuredQuery,
-  validateQueryAgainstRegistry,
-} from '../lib/orchestrator/query-grounding';
 import type { Database } from 'duckdb';
-import type { FeatureCollection } from 'geojson';
-import type { StructuredQuery } from '../../../shared/types/query';
+import { prepareQuery, executeQuery } from '../lib/utils/query-executor';
 
 // Store database instance (initialized on startup)
 let dbInstance: Database | null = null;
@@ -31,49 +21,6 @@ export function setDatabase(db: Database): void {
 
 export function setLayerRegistry(registry: LayerRegistry): void {
   layerRegistry = registry;
-}
-
-function convertBigInts(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'bigint') {
-      result[key] = Number.isSafeInteger(Number(value))
-        ? Number(value)
-        : value.toString();
-    } else if (
-      typeof value === 'string' &&
-      (key === 'route_ids' || key === 'route_names' || key === 'restrictions')
-    ) {
-      try {
-        const parsed = JSON.parse(value);
-        result[key] = Array.isArray(parsed) ? parsed : value;
-      } catch {
-        result[key] = value;
-      }
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-function rowToFeature(row: Record<string, unknown>): GeoJSON.Feature {
-  const { geometry, ...properties } = row;
-
-  let geom: GeoJSON.Geometry;
-  if (typeof geometry === 'string') {
-    geom = JSON.parse(geometry) as GeoJSON.Geometry;
-  } else if (typeof geometry === 'object' && geometry !== null) {
-    geom = geometry as GeoJSON.Geometry;
-  } else {
-    throw new Error('Invalid geometry in result');
-  }
-
-  return {
-    type: 'Feature',
-    geometry: geom,
-    properties: convertBigInts(properties),
-  };
 }
 
 function extractStructuredQueryPayload(body: unknown): {
@@ -120,53 +67,41 @@ queryRoute.post('/', async (c) => {
 
     const validatedQuery = validateQuery(payload);
 
-    const normalized = normalizeStructuredQuery(validatedQuery);
-    const issues = validateQueryAgainstRegistry(normalized.query, layerRegistry);
-    if (issues.length > 0) {
-      return c.json(
-        {
-          error: 'Query validation failed against loaded data',
-          details: issues,
-          suggestions: buildValidationSuggestions(layerRegistry),
-          normalizationNotes: normalized.notes,
-        },
-        400
-      );
+    let prepared;
+    try {
+      prepared = prepareQuery(validatedQuery, layerRegistry);
+    } catch (err) {
+      const prepErr = err as Error & { validationIssues?: string[]; normalizationNotes?: string[] };
+      if (prepErr.validationIssues) {
+        return c.json(
+          {
+            error: 'Query validation failed against loaded data',
+            details: prepErr.validationIssues,
+            suggestions: buildValidationSuggestions(layerRegistry),
+            normalizationNotes: prepErr.normalizationNotes ?? [],
+          },
+          400
+        );
+      }
+      throw err;
     }
 
-    const limitApplication = applyQueryLimits(normalized.query, layerRegistry);
-    const executableQuery: StructuredQuery = limitApplication.query;
-
-    const builder = new QueryBuilder(executableQuery, {
-      simplifyToleranceDeg: limitApplication.simplifyToleranceDeg,
-    });
-    const { sql, params } = builder.build();
-
-    const start = performance.now();
-    const conn = await getConnection(dbInstance);
-    const rows = await query<Record<string, unknown>>(conn, sql, ...params);
-    const elapsed = performance.now() - start;
-
-    const features = rows.map(rowToFeature);
-    const result: FeatureCollection = {
-      type: 'FeatureCollection',
-      features,
-    };
+    const { result, executionTimeMs, prepared: p } = await executeQuery(prepared, dbInstance);
 
     return c.json({
       ...result,
       metadata: {
-        count: features.length,
-        executionTimeMs: Math.round(elapsed * 100) / 100,
-        query: executableQuery,
-        queryHash: getQueryHash(executableQuery),
-        sourceLayers: getQuerySourceLayers(executableQuery),
-        truncated: limitApplication.truncated,
-        maxFeaturesApplied: limitApplication.maxFeaturesApplied,
-        hardCap: limitApplication.hardCap,
-        defaultLimitApplied: limitApplication.defaultLimitApplied,
-        simplifyToleranceDeg: limitApplication.simplifyToleranceDeg,
-        normalizationNotes: normalized.notes,
+        count: result.features.length,
+        executionTimeMs: Math.round(executionTimeMs * 100) / 100,
+        query: p.executableQuery,
+        queryHash: p.queryHash,
+        sourceLayers: p.sourceLayers,
+        truncated: p.truncated,
+        maxFeaturesApplied: p.maxFeaturesApplied,
+        hardCap: p.hardCap,
+        defaultLimitApplied: p.defaultLimitApplied,
+        simplifyToleranceDeg: p.simplifyToleranceDeg,
+        normalizationNotes: p.normalizationNotes,
         requestFormat,
       },
     });

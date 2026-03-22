@@ -19,7 +19,7 @@ export interface ParcelProperties {
   zoning: string;
   land_use: string;
   acres: number;
-  year_built: number | null;
+  year_built: string | null; // VARCHAR in DuckDB; use TRY_CAST for numeric comparisons
   assessed_value: number | null;
 }
 
@@ -114,9 +114,9 @@ export interface ShortTermRentalProperties {
   host_id: string | null;
   property_type: string;
   room_type: string | null;
-  accommodates: number | null;
-  price_per_night: number | null;
-  availability_365: number | null; // Days available per year
+  accommodates: string | null; // VARCHAR in DuckDB
+  price_per_night: string | null; // VARCHAR in DuckDB
+  availability_365: string | null; // VARCHAR in DuckDB; days available per year
   last_scraped: string | null; // ISO date string
   source: 'airbnb' | 'vrbo' | 'other';
   address: string | null; // Full address
@@ -201,9 +201,9 @@ export interface TransitAccessProperties {
   route_ids: string[]; // Array of route identifiers
   route_names: string[];
   stop_type: 'bus' | 'rail' | 'other';
-  wheelchair_accessible: boolean | null;
+  wheelchair_accessible: string | null; // VARCHAR in DuckDB ("true"/"false")
   // Headway info if available
-  avg_headway_minutes: number | null;
+  avg_headway_minutes: string | null; // VARCHAR in DuckDB
 }
 
 export type TransitAccessFeature = Feature<Point, TransitAccessProperties>;
@@ -325,7 +325,7 @@ export interface ParkProperties {
   park_type: string;
   owner: string;
   acres: number | null;
-  trail_miles: number | null;
+  trail_miles: string | null; // VARCHAR in DuckDB
   status: string | null;
   council_district: string | null;
 }
@@ -341,7 +341,7 @@ export interface BikewayProperties {
   name: string | null;
   bikeway_type: string;
   surface: string | null;
-  length_miles: number | null;
+  length_miles: string | null; // VARCHAR in DuckDB
 }
 
 export type BikewayFeature = Feature<LineString, BikewayProperties>;
@@ -388,7 +388,7 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       zoning: 'string',
       land_use: 'string',
       acres: 'number',
-      year_built: 'number | null',
+      year_built: 'string | null',
       assessed_value: 'number | null',
     },
   },
@@ -456,9 +456,9 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       host_id: 'string | null',
       property_type: 'string',
       room_type: 'string | null',
-      accommodates: 'number | null',
-      price_per_night: 'number | null',
-      availability_365: 'number | null',
+      accommodates: 'string | null',
+      price_per_night: 'string | null',
+      availability_365: 'string | null',
       last_scraped: 'string | null',
       source: 'string', // 'airbnb' | 'vrbo' | 'other'
       address: 'string | null',
@@ -519,8 +519,8 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       route_ids: 'string[]',
       route_names: 'string[]',
       stop_type: 'string', // 'bus' | 'rail' | 'other'
-      wheelchair_accessible: 'boolean | null',
-      avg_headway_minutes: 'number | null',
+      wheelchair_accessible: 'string | null',
+      avg_headway_minutes: 'string | null',
     },
   },
   school_zones: {
@@ -604,7 +604,7 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       park_type: 'string',
       owner: 'string',
       acres: 'number | null',
-      trail_miles: 'number | null',
+      trail_miles: 'string | null',
       status: 'string | null',
       council_district: 'string | null',
     },
@@ -618,7 +618,7 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       name: 'string | null',
       bikeway_type: 'string',
       surface: 'string | null',
-      length_miles: 'number | null',
+      length_miles: 'string | null',
     },
   },
 } as const;
