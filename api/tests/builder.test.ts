@@ -422,4 +422,65 @@ describe('QueryBuilder', () => {
       }
     });
   });
+
+  describe('VARCHAR numeric field coercion', () => {
+    it('wraps VARCHAR numeric fields with TRY_CAST for gt/lt/gte/lte', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        attributeFilters: [
+          { field: 'year_built', op: 'gt', value: 2000 },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).toContain('TRY_CAST("year_built" AS DOUBLE)');
+      expect(sql).toContain('> $1');
+    });
+
+    it('does not cast VARCHAR fields for eq/like operations', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        attributeFilters: [
+          { field: 'year_built', op: 'eq', value: '2000' },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).not.toContain('TRY_CAST');
+      expect(sql).toContain('"year_built" = $1');
+    });
+
+    it('casts STR numeric fields for numeric comparisons', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'short_term_rentals',
+        attributeFilters: [
+          { field: 'price_per_night', op: 'lte', value: 200 },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).toContain('TRY_CAST("price_per_night" AS DOUBLE)');
+    });
+
+    it('does not cast genuinely numeric fields', () => {
+      const query: StructuredQuery = {
+        selectLayer: 'parcels',
+        attributeFilters: [
+          { field: 'assessed_value', op: 'gt', value: 500000 },
+        ],
+      };
+
+      const builder = new QueryBuilder(query);
+      const { sql } = builder.build();
+
+      expect(sql).not.toContain('TRY_CAST');
+      expect(sql).toContain('"assessed_value" > $1');
+    });
+  });
 });
