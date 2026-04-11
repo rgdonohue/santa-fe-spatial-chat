@@ -90,21 +90,11 @@ async function buildFixtureRegistry(connection: Connection): Promise<LayerRegist
       .map((r) => r.column_name)
       .filter((n) => !internal.has(n));
 
-    // Fields that are VARCHAR in DuckDB but logically numeric
-    // (must match VARCHAR_NUMERIC_FIELDS in builder.ts for TRY_CAST to work)
-    const varcharNumericFields: Record<string, Set<string>> = {
-      parcels: new Set(['year_built']),
-      short_term_rentals: new Set(['accommodates', 'price_per_night', 'availability_365']),
-    };
-
     const schemaFields: Record<string, string> = {};
     for (const row of descRows) {
       if (internal.has(row.column_name)) continue;
-      const isDbNumeric = row.column_type.includes('INT') || row.column_type.includes('DOUBLE');
-      const isLogicallyNumeric = varcharNumericFields[table.name]?.has(row.column_name);
-      schemaFields[row.column_name] = (isDbNumeric || isLogicallyNumeric)
-        ? 'number | null'
-        : 'string | null';
+      const isNumeric = row.column_type.includes('INT') || row.column_type.includes('DOUBLE');
+      schemaFields[row.column_name] = isNumeric ? 'number | null' : 'string | null';
     }
 
     // Add virtual fields for zoning
@@ -151,23 +141,23 @@ async function createFixtureTables(connection: Connection): Promise<void> {
     FROM (
       SELECT
         'P001' AS parcel_id, '100 Main St' AS address, 'R-1' AS zoning,
-        'residential' AS land_use, 0.25 AS acres, '1985' AS year_built,
+        'residential' AS land_use, 0.25 AS acres, 1985 AS year_built,
         350000 AS assessed_value,
         ST_GeomFromText('POLYGON((-105.940 35.688, -105.939 35.688, -105.939 35.687, -105.940 35.687, -105.940 35.688))') AS geom
       UNION ALL SELECT
-        'P002', '200 Palace Ave', 'R-1', 'residential', 0.30, '2005',
+        'P002', '200 Palace Ave', 'R-1', 'residential', 0.30, 2005,
         475000,
         ST_GeomFromText('POLYGON((-105.938 35.688, -105.937 35.688, -105.937 35.687, -105.938 35.687, -105.938 35.688))')
       UNION ALL SELECT
-        'P003', '300 Cerrillos Rd', 'C-2', 'commercial', 1.20, '1972',
+        'P003', '300 Cerrillos Rd', 'C-2', 'commercial', 1.20, 1972,
         890000,
         ST_GeomFromText('POLYGON((-105.942 35.685, -105.941 35.685, -105.941 35.684, -105.942 35.684, -105.942 35.685))')
       UNION ALL SELECT
-        'P004', '400 Agua Fria St', 'R-2', 'residential', 0.15, '2018',
+        'P004', '400 Agua Fria St', 'R-2', 'residential', 0.15, 2018,
         285000,
         ST_GeomFromText('POLYGON((-105.945 35.686, -105.944 35.686, -105.944 35.685, -105.945 35.685, -105.945 35.686))')
       UNION ALL SELECT
-        'P005', '500 Canyon Rd', 'R-1', 'residential', 0.40, '1948',
+        'P005', '500 Canyon Rd', 'R-1', 'residential', 0.40, 1948,
         620000,
         ST_GeomFromText('POLYGON((-105.936 35.686, -105.935 35.686, -105.935 35.685, -105.936 35.685, -105.936 35.686))')
     ) sub
@@ -246,16 +236,16 @@ async function createFixtureTables(connection: Connection): Promise<void> {
     FROM (
       SELECT
         'STR001' AS listing_id, 'Entire home' AS property_type,
-        'Entire home/apt' AS room_type, '185' AS price_per_night,
-        '2' AS accommodates, '200' AS availability_365,
+        'Entire home/apt' AS room_type, 185 AS price_per_night,
+        2 AS accommodates, 200 AS availability_365,
         ST_Point(-105.939, 35.688) AS geom
       UNION ALL SELECT
-        'STR002', 'Private room', 'Private room', '75',
-        '1', '340',
+        'STR002', 'Private room', 'Private room', 75,
+        1, 340,
         ST_Point(-105.937, 35.687)
       UNION ALL SELECT
-        'STR003', 'Entire home', 'Entire home/apt', '250',
-        '4', '150',
+        'STR003', 'Entire home', 'Entire home/apt', 250,
+        4, 150,
         ST_Point(-105.936, 35.686)
     ) sub
   `);
@@ -374,29 +364,29 @@ describe('Pipeline integration: attribute queries', () => {
   });
 });
 
-describe('Pipeline integration: VARCHAR numeric casting', () => {
-  it('casts year_built for numeric comparison', async () => {
+describe('Pipeline integration: numeric field comparisons', () => {
+  it('filters parcels by year_built (numeric DOUBLE)', async () => {
     const { result } = await runPipeline({
       selectLayer: 'parcels',
       attributeFilters: [{ field: 'year_built', op: 'gt', value: 2000 }],
     });
 
-    // P002 year_built='2005', P004 year_built='2018'
+    // P002 year_built=2005.0, P004 year_built=2018.0
     expect(result.features.length).toBe(2);
     for (const feature of result.features) {
-      expect(Number(feature.properties!.year_built)).toBeGreaterThan(2000);
+      expect(feature.properties!.year_built).toBeGreaterThan(2000);
     }
   });
 
-  it('casts price_per_night for STR comparison', async () => {
+  it('filters STRs by price_per_night (numeric DOUBLE)', async () => {
     const { result } = await runPipeline({
       selectLayer: 'short_term_rentals',
       attributeFilters: [{ field: 'price_per_night', op: 'lte', value: 100 }],
     });
 
-    // STR002 price_per_night='75'
+    // STR002 price_per_night=75.0
     expect(result.features.length).toBe(1);
-    expect(Number(result.features[0]!.properties!.price_per_night)).toBeLessThanOrEqual(100);
+    expect(result.features[0]!.properties!.price_per_night).toBeLessThanOrEqual(100);
   });
 });
 

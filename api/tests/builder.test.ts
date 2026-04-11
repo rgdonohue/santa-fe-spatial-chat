@@ -423,8 +423,8 @@ describe('QueryBuilder', () => {
     });
   });
 
-  describe('VARCHAR numeric field coercion', () => {
-    it('wraps VARCHAR numeric fields with TRY_CAST for gt/lt/gte/lte', () => {
+  describe('attribute filter SQL generation', () => {
+    it('generates gt comparison for numeric field', () => {
       const query: StructuredQuery = {
         selectLayer: 'parcels',
         attributeFilters: [
@@ -435,26 +435,25 @@ describe('QueryBuilder', () => {
       const builder = new QueryBuilder(query);
       const { sql } = builder.build();
 
-      expect(sql).toContain('TRY_CAST("year_built" AS DOUBLE)');
-      expect(sql).toContain('> $1');
+      expect(sql).toContain('"year_built" > $1');
+      expect(sql).not.toContain('TRY_CAST');
     });
 
-    it('does not cast VARCHAR fields for eq/like operations', () => {
+    it('generates eq comparison with correct placeholder', () => {
       const query: StructuredQuery = {
         selectLayer: 'parcels',
         attributeFilters: [
-          { field: 'year_built', op: 'eq', value: '2000' },
+          { field: 'year_built', op: 'eq', value: 2000 },
         ],
       };
 
       const builder = new QueryBuilder(query);
       const { sql } = builder.build();
 
-      expect(sql).not.toContain('TRY_CAST');
       expect(sql).toContain('"year_built" = $1');
     });
 
-    it('casts STR numeric fields for numeric comparisons', () => {
+    it('generates lte comparison for STR price field', () => {
       const query: StructuredQuery = {
         selectLayer: 'short_term_rentals',
         attributeFilters: [
@@ -465,10 +464,11 @@ describe('QueryBuilder', () => {
       const builder = new QueryBuilder(query);
       const { sql } = builder.build();
 
-      expect(sql).toContain('TRY_CAST("price_per_night" AS DOUBLE)');
+      expect(sql).toContain('"price_per_night" <= $1');
+      expect(sql).not.toContain('TRY_CAST');
     });
 
-    it('does not cast genuinely numeric fields', () => {
+    it('generates gt comparison for assessed_value', () => {
       const query: StructuredQuery = {
         selectLayer: 'parcels',
         attributeFilters: [
