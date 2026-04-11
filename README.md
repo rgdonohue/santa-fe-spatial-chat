@@ -108,6 +108,51 @@ See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for complete documentation of d
 
 ---
 
+## Docker
+
+### Build and run
+
+```bash
+# Build the image
+docker build -t santa-fe-spatial-chat .
+
+# Run with local parquet data mounted
+docker run --rm -p 3000:3000 \
+  -v $(pwd)/api/data:/app/api/data \
+  santa-fe-spatial-chat
+```
+
+The API is now available at `http://localhost:3000`.
+
+### Environment variables
+
+Pass env vars with `-e` flags:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -v $(pwd)/api/data:/app/api/data \
+  -e TOGETHER_API_KEY=your_key_here \
+  -e CORS_ORIGIN=https://your-frontend.com \
+  santa-fe-spatial-chat
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Port the API listens on |
+| `CORS_ORIGIN` | `*` | Allowed CORS origin (use specific domain in production) |
+| `TOGETHER_API_KEY` | — | Use Together.ai for LLM; falls back to Ollama if unset |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model name |
+
+### Quick health check
+
+```bash
+curl http://localhost:3000/api/health
+# → {"status":"ok"}
+```
+
+---
+
 ## Local Development
 
 ### Prerequisites

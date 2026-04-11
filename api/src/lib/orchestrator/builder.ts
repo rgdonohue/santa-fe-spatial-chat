@@ -16,6 +16,12 @@ import { LAYER_SCHEMAS } from '../../../../shared/types/geo';
  * Fields stored as VARCHAR in DuckDB that may need numeric casting for comparisons.
  * When the LLM generates numeric filters (gt, lt, gte, lte) against these fields,
  * the builder wraps them with TRY_CAST(field AS DOUBLE) to avoid type errors.
+ *
+ * TODO: Remove this map once the affected parquets have been regenerated using
+ * the updated prepare-data.ts, which casts these fields to DOUBLE at ingest time.
+ * At that point the parquets will store them as DOUBLE natively, the TRY_CAST
+ * wrappers here are no longer needed, and geo.ts types can be updated from
+ * `string | null` to `number | null` for the affected fields.
  */
 const VARCHAR_NUMERIC_FIELDS: Record<string, Set<string>> = {
   parcels: new Set(['year_built']),

@@ -30,6 +30,23 @@ import { LAYER_SCHEMAS } from '../../shared/types/geo';
 // ============================================================================
 
 /**
+ * Fields stored as VARCHAR in the source data that should be cast to DOUBLE
+ * during parquet generation using TRY_CAST. Malformed values become NULL.
+ *
+ * Keyed by layer name, values are the OUTPUT field names (post-mapping).
+ * Mirrors the VARCHAR_NUMERIC_FIELDS map in builder.ts — once parquets have
+ * been regenerated with these casts applied, the workaround in builder.ts
+ * can be removed.
+ */
+const VARCHAR_NUMERIC_FIELDS: Record<string, Set<string>> = {
+  parcels: new Set(['year_built']),
+  short_term_rentals: new Set(['accommodates', 'price_per_night', 'availability_365']),
+  transit_access: new Set(['avg_headway_minutes']),
+  parks: new Set(['trail_miles']),
+  bikeways: new Set(['length_miles']),
+};
+
+/**
  * Field mappings for each layer
  * Maps raw data field names to schema-compliant field names
  */
@@ -159,16 +176,25 @@ function getGeometryType(layerName: LayerName): string {
 }
 
 /**
- * Build field selection SQL with renaming based on FIELD_MAPPINGS
+ * Build field selection SQL with renaming based on FIELD_MAPPINGS.
+ * Fields listed in VARCHAR_NUMERIC_FIELDS are cast to DOUBLE via TRY_CAST
+ * so the output parquet stores them as a numeric type; malformed values
+ * become NULL rather than causing a type error.
  */
 function buildFieldSelectSql(
   layerName: string,
   schemaRows: Array<{ column_name: string; column_type: string }>,
   geometryCol: string
-): { selectFields: string[]; outputFields: Record<string, string> } {
-  const mappings = FIELD_MAPPINGS[layerName] || {};
+): {
+  selectFields: string[];
+  outputFields: Record<string, string>;
+  castFieldPairs: Array<{ sourceField: string; outputField: string }>;
+} {
+  const mappings = FIELD_MAPPINGS[layerName] ?? {};
+  const numericFields = VARCHAR_NUMERIC_FIELDS[layerName] ?? new Set<string>();
   const selectFields: string[] = [];
   const outputFields: Record<string, string> = {};
+  const castFieldPairs: Array<{ sourceField: string; outputField: string }> = [];
 
   for (const row of schemaRows) {
     const colName = row.column_name;
@@ -177,20 +203,21 @@ function buildFieldSelectSql(
       continue;
     }
 
-    // Check if we have a mapping for this field
-    if (mappings[colName]) {
-      const newName = mappings[colName];
-      selectFields.push(`"${colName}" AS "${newName}"`);
-      outputFields[newName] = row.column_type;
+    // Determine output field name (apply mapping, or lowercase original)
+    const outputName = mappings[colName] ?? colName.toLowerCase();
+
+    // Cast VARCHAR fields that represent numbers to DOUBLE
+    if (numericFields.has(outputName)) {
+      selectFields.push(`TRY_CAST("${colName}" AS DOUBLE) AS "${outputName}"`);
+      outputFields[outputName] = 'DOUBLE';
+      castFieldPairs.push({ sourceField: colName, outputField: outputName });
     } else {
-      // Keep original field name (lowercase for consistency)
-      const lowerName = colName.toLowerCase();
-      selectFields.push(`"${colName}" AS "${lowerName}"`);
-      outputFields[lowerName] = row.column_type;
+      selectFields.push(`"${colName}" AS "${outputName}"`);
+      outputFields[outputName] = row.column_type;
     }
   }
 
-  return { selectFields, outputFields };
+  return { selectFields, outputFields, castFieldPairs };
 }
 
 /**
@@ -560,8 +587,8 @@ async function processLayer(
               row.column_name.toLowerCase().includes('geom')
           )?.column_name || 'geometry';
 
-        // Build field selection with renaming
-        const { selectFields, outputFields } = buildFieldSelectSql(
+        // Build field selection with renaming (and optional TRY_CAST for numeric VARCHAR fields)
+        const { selectFields, outputFields, castFieldPairs } = buildFieldSelectSql(
           layerName,
           schemaRows,
           geometryCol
@@ -608,51 +635,93 @@ async function processLayer(
                 return;
               }
 
-              // Export to GeoParquet
-              // Note: DuckDB stores arrays as JSON strings in Parquet
-              // Arrays will be parsed back to arrays in rowToFeature() functions
-              const exportSql = `
-                COPY (
-                  SELECT
-                    * EXCLUDE (geom_4326),
-                    ST_AsWKB(geom_4326) as geometry
-                  FROM ${layerName}
-                ) TO '${outputPath}' (FORMAT PARQUET);
-              `;
-
-              conn.exec(exportSql, (err: DuckDbError | null) => {
-                if (err) {
-                  reject(new Error(`Failed to export to GeoParquet: ${err.message}`));
+              // Report cast failures for VARCHAR → DOUBLE conversions.
+              // Queries the temp table (still available) using TRY_CAST inline
+              // so we can count how many non-null source values failed to cast.
+              function checkCastFailuresThenExport(): void {
+                if (castFieldPairs.length === 0) {
+                  doExport();
                   return;
                 }
 
-                // Clean up
-                conn.exec(`DROP TABLE ${tempTable}; DROP TABLE ${layerName};`, () => {
-                  const schema = LAYER_SCHEMAS[layerName];
-                  const manifest: LayerManifest = {
-                    name: layerName,
-                    source: inputPath,
-                    sourceSrid,
-                    geometryType: schema.geometryType,
-                    featureCount: Number(stats.count),
-                    extent: {
-                      minX: Number(stats.minX),
-                      minY: Number(stats.minY),
-                      maxX: Number(stats.maxX),
-                      maxY: Number(stats.maxY),
-                    },
-                    fields: outputFields,
-                    crs: {
-                      geom_4326: 'EPSG:4326',
-                      geom_utm13: 'EPSG:32613',
-                    },
-                    generatedAt: new Date().toISOString(),
-                    version: '1.0.0',
-                  };
+                const clauses = castFieldPairs.flatMap(({ sourceField }) => [
+                  `COUNT(*) FILTER (WHERE "${sourceField}" IS NOT NULL) AS "${sourceField}__non_null"`,
+                  `COUNT(*) FILTER (WHERE "${sourceField}" IS NOT NULL AND TRY_CAST("${sourceField}" AS DOUBLE) IS NULL) AS "${sourceField}__failures"`,
+                ]);
+                const castCheckSql = `SELECT ${clauses.join(', ')} FROM ${tempTable}`;
 
-                  resolve(manifest);
+                conn.all(castCheckSql, (err: DuckDbError | null, checkRows: unknown[]) => {
+                  if (err) {
+                    console.warn(`  Warning: Could not check cast failures: ${err.message}`);
+                  } else if (checkRows[0]) {
+                    const row = checkRows[0] as Record<string, number>;
+                    for (const { sourceField } of castFieldPairs) {
+                      const nonNull = Number(row[`${sourceField}__non_null`] ?? 0);
+                      const failures = Number(row[`${sourceField}__failures`] ?? 0);
+                      if (failures > 0) {
+                        console.warn(
+                          `  Warning: ${layerName}.${sourceField}: ${failures}/${nonNull} non-null values failed TRY_CAST to DOUBLE (stored as NULL)`
+                        );
+                      } else {
+                        console.log(
+                          `  ✓ ${layerName}.${sourceField}: ${nonNull} non-null values cast to DOUBLE successfully`
+                        );
+                      }
+                    }
+                  }
+                  doExport();
                 });
-              });
+              }
+
+              // Export to GeoParquet
+              // Note: DuckDB stores arrays as JSON strings in Parquet
+              // Arrays will be parsed back to arrays in rowToFeature() functions
+              function doExport(): void {
+                const exportSql = `
+                  COPY (
+                    SELECT
+                      * EXCLUDE (geom_4326),
+                      ST_AsWKB(geom_4326) as geometry
+                    FROM ${layerName}
+                  ) TO '${outputPath}' (FORMAT PARQUET);
+                `;
+
+                conn.exec(exportSql, (err: DuckDbError | null) => {
+                  if (err) {
+                    reject(new Error(`Failed to export to GeoParquet: ${err.message}`));
+                    return;
+                  }
+
+                  // Clean up
+                  conn.exec(`DROP TABLE ${tempTable}; DROP TABLE ${layerName};`, () => {
+                    const schema = LAYER_SCHEMAS[layerName];
+                    const manifest: LayerManifest = {
+                      name: layerName,
+                      source: inputPath,
+                      sourceSrid,
+                      geometryType: schema.geometryType,
+                      featureCount: Number(stats.count),
+                      extent: {
+                        minX: Number(stats.minX),
+                        minY: Number(stats.minY),
+                        maxX: Number(stats.maxX),
+                        maxY: Number(stats.maxY),
+                      },
+                      fields: outputFields,
+                      crs: {
+                        geom_4326: 'EPSG:4326',
+                        geom_utm13: 'EPSG:32613',
+                      },
+                      generatedAt: new Date().toISOString(),
+                      version: '1.0.0',
+                    };
+
+                    resolve(manifest);
+                  });
+                });
+              }
+
+              checkCastFailuresThenExport();
             });
           }
         );
