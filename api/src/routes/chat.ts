@@ -209,20 +209,27 @@ chatRoute.post('/', async (c) => {
 
     const { result, executionTimeMs, queryCacheHit } = await executeQuery(prepared, dbInstance);
 
-    const explanation = generateExplanation(prepared.executableQuery, result.features.length);
+    const deterministicExplanation = generateExplanation(
+      prepared.executableQuery,
+      result.features.length
+    );
 
-    // Fire equity explanation in parallel — don't block the response if it fails
+    // Attempt LLM equity explanation (5s timeout); fall back to deterministic on failure
     let equityNarrative: string | null = null;
     try {
       const equity = await generateEquityExplanation(
         llmClient,
         prepared.executableQuery,
-        result.features.length
+        result.features.length,
+        result.features as Array<{ properties: Record<string, unknown> | null }>,
+        { timeoutMs: 5000 }
       );
       equityNarrative = equity.equityNarrative;
     } catch {
       // Graceful degradation — equity narrative is optional
     }
+
+    const explanation = equityNarrative ?? deterministicExplanation;
 
     return c.json({
       query: prepared.executableQuery,

@@ -113,13 +113,50 @@ export function generateExplanation(query: StructuredQuery, count: number): stri
 }
 
 /**
+ * Compute min/median/max for numeric fields across result features.
+ * Returns a formatted string for inclusion in the LLM prompt.
+ */
+function computeResultStats(
+  features: Array<{ properties: Record<string, unknown> | null }>
+): string {
+  if (features.length === 0) return '';
+
+  const numericFields: Record<string, number[]> = {};
+  for (const feature of features) {
+    const props = feature.properties;
+    if (!props) continue;
+    for (const [key, value] of Object.entries(props)) {
+      if (typeof value === 'number' && isFinite(value)) {
+        if (!numericFields[key]) numericFields[key] = [];
+        numericFields[key]!.push(value);
+      }
+    }
+  }
+
+  const lines: string[] = [];
+  for (const [field, values] of Object.entries(numericFields)) {
+    if (values.length === 0) continue;
+    const sorted = [...values].sort((a, b) => a - b);
+    const min = sorted[0]!;
+    const max = sorted[sorted.length - 1]!;
+    const median = sorted[Math.floor(sorted.length / 2)]!;
+    lines.push(
+      `  ${field}: min=${min.toLocaleString()}, median=${median.toLocaleString()}, max=${max.toLocaleString()}`
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Build the equity explanation prompt sent to the LLM.
  * Exported for testing.
  */
 export function buildEquityPrompt(
   query: StructuredQuery,
   deterministicExplanation: string,
-  count: number
+  count: number,
+  features: Array<{ properties: Record<string, unknown> | null }> = []
 ): string {
   const equityHint = EQUITY_CONTEXT[query.selectLayer] ?? '';
   const spatialLayers = (query.spatialFilters ?? []).map((f) => f.targetLayer);
@@ -127,6 +164,8 @@ export function buildEquityPrompt(
     .map((l) => EQUITY_CONTEXT[l])
     .filter(Boolean)
     .join(' ');
+
+  const stats = computeResultStats(features);
 
   return `You are a housing equity analyst for Santa Fe, New Mexico.
 A user queried spatial data and got the following result:
@@ -138,6 +177,7 @@ Query details:
 - Feature count: ${count}
 ${query.attributeFilters?.length ? `- Attribute filters: ${JSON.stringify(query.attributeFilters)}` : ''}
 ${query.spatialFilters?.length ? `- Spatial filters: ${JSON.stringify(query.spatialFilters)}` : ''}
+${stats ? `\nResult statistics (value ranges across matched features):\n${stats}` : ''}
 
 ${equityHint ? `Context: ${equityHint}` : ''}
 ${additionalContext ? `Additional context: ${additionalContext}` : ''}
@@ -153,30 +193,35 @@ Keep it concise, factual, and specific to Santa Fe. Do not use bullet points.`;
 /**
  * Generate an LLM-enriched explanation with housing equity context.
  *
- * Falls back to the deterministic explanation on any failure,
+ * Falls back to the deterministic explanation on any failure or timeout,
  * so callers can always use the result directly.
  */
 export async function generateEquityExplanation(
   llm: LLMClient,
   query: StructuredQuery,
   count: number,
+  features: Array<{ properties: Record<string, unknown> | null }> = [],
   options?: { timeoutMs?: number }
 ): Promise<{ explanation: string; equityNarrative: string | null }> {
   const deterministicExplanation = generateExplanation(query, count);
 
   try {
-    const prompt = buildEquityPrompt(query, deterministicExplanation, count);
-    const narrative = await llm.complete(prompt, {
-      temperature: 0.3,
-      maxTokens: 300,
-    });
+    const prompt = buildEquityPrompt(query, deterministicExplanation, count, features);
+    const timeoutMs = options?.timeoutMs ?? 5000;
+
+    const narrative = await Promise.race([
+      llm.complete(prompt, { temperature: 0.3, maxTokens: 300 }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('LLM explanation timed out')), timeoutMs)
+      ),
+    ]);
 
     return {
       explanation: deterministicExplanation,
       equityNarrative: narrative.trim(),
     };
   } catch {
-    // LLM unavailable — degrade gracefully
+    // LLM unavailable or timed out — degrade gracefully
     return {
       explanation: deterministicExplanation,
       equityNarrative: null,
