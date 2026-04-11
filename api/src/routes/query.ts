@@ -10,6 +10,7 @@ import { validateQuery } from '../lib/orchestrator/validator';
 import type { LayerRegistry } from '../lib/layers/registry';
 import type { Database } from 'duckdb';
 import { prepareQuery, executeQuery } from '../lib/utils/query-executor';
+import { log } from '../lib/logger';
 
 // Store database instance (initialized on startup)
 let dbInstance: Database | null = null;
@@ -88,6 +89,16 @@ queryRoute.post('/', async (c) => {
 
     const { result, executionTimeMs, prepared: p } = await executeQuery(prepared, dbInstance);
 
+    log({
+      level: 'info',
+      event: 'query.execute',
+      executionTimeMs: Math.round(executionTimeMs * 100) / 100,
+      featureCount: result.features.length,
+      layer: p.executableQuery.selectLayer,
+      queryHash: p.queryHash,
+      requestFormat,
+    });
+
     return c.json({
       ...result,
       metadata: {
@@ -134,6 +145,12 @@ queryRoute.post('/', async (c) => {
         );
       }
 
+      log({
+        level: 'error',
+        event: 'query.error',
+        errorType: error.name,
+        errorMessage: error.message,
+      });
       return c.json(
         {
           error: 'Query execution failed',
@@ -143,6 +160,7 @@ queryRoute.post('/', async (c) => {
       );
     }
 
+    log({ level: 'error', event: 'query.error', errorType: 'unknown', errorMessage: 'Unknown error' });
     return c.json({ error: 'Unknown error' }, 500);
   }
 });

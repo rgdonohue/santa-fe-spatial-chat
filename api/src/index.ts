@@ -19,6 +19,7 @@ import { createServer as createNetServer } from 'node:net';
 import { join } from 'path';
 import { buildLayerRegistry } from './lib/layers/registry';
 import { RateLimiter, createRateLimitMiddleware } from './lib/middleware/rate-limiter';
+import { log } from './lib/logger';
 import type { Database } from 'duckdb';
 
 const app = new Hono();
@@ -45,6 +46,27 @@ app.use('*', async (c, next) => {
   } finally {
     activeRequests--;
   }
+});
+
+// ── Request logging ───────────────────────────────────────────────────────────
+app.use('*', async (c, next) => {
+  const start = performance.now();
+  await next();
+  const durationMs = Math.round((performance.now() - start) * 100) / 100;
+  const forwarded = c.req.raw.headers.get('x-forwarded-for');
+  const ip =
+    (forwarded ? forwarded.split(',')[0]!.trim() : null) ??
+    c.req.raw.headers.get('x-real-ip') ??
+    'unknown';
+  log({
+    level: 'info',
+    event: 'request',
+    method: c.req.method,
+    path: new URL(c.req.url).pathname,
+    status: c.res.status,
+    durationMs,
+    ip,
+  });
 });
 
 // ── Rate limiting ──────────────────────────────────────────────────────────────

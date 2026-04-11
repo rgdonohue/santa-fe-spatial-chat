@@ -25,6 +25,7 @@ import {
 } from '../lib/orchestrator/intent-router';
 import { prepareQuery, executeQuery } from '../lib/utils/query-executor';
 import { generateExplanation, generateEquityExplanation } from '../lib/utils/explanation';
+import { log } from '../lib/logger';
 
 // ── Request validation schema ─────────────────────────────────────────────────
 const chatBodySchema = z.object({
@@ -59,7 +60,7 @@ export function setLayerRegistry(registry: LayerRegistry): void {
       Object.values(registry.layers).map((layer) => [layer.name, layer.queryableFields])
     )
   );
-  console.log(`  Parser configured with layers: ${registry.loadedLayerNames.join(', ')}`);
+  log({ level: 'info', event: 'chat.config', layers: registry.loadedLayerNames });
 }
 
 function generateDynamicSuggestions(availableLayers: string[]): string[] {
@@ -207,6 +208,14 @@ chatRoute.post('/', async (c) => {
       }
     }
 
+    log({
+      level: 'info',
+      event: 'chat.parse',
+      parseTimeMs: Math.round(parseTimeMs * 100) / 100,
+      parseCacheHit,
+      confidence: parseResult.confidence,
+    });
+
     // --- Shared prepare + execute pipeline ---
     let prepared;
     try {
@@ -230,6 +239,16 @@ chatRoute.post('/', async (c) => {
 
     const { result, executionTimeMs, queryCacheHit } = await executeQuery(prepared, dbInstance);
 
+    log({
+      level: 'info',
+      event: 'chat.execute',
+      executionTimeMs: Math.round(executionTimeMs * 100) / 100,
+      queryCacheHit,
+      featureCount: result.features.length,
+      layer: prepared.executableQuery.selectLayer,
+      queryHash: prepared.queryHash,
+    });
+
     const deterministicExplanation = generateExplanation(
       prepared.executableQuery,
       result.features.length
@@ -249,6 +268,12 @@ chatRoute.post('/', async (c) => {
     } catch {
       // Graceful degradation — equity narrative is optional
     }
+
+    log({
+      level: 'info',
+      event: 'chat.equity',
+      equityNarrativeReturned: equityNarrative !== null,
+    });
 
     const explanation = equityNarrative ?? deterministicExplanation;
 
@@ -278,6 +303,12 @@ chatRoute.post('/', async (c) => {
     });
   } catch (error) {
     if (error instanceof Error) {
+      log({
+        level: 'error',
+        event: 'chat.error',
+        errorType: error.name,
+        errorMessage: error.message,
+      });
       return c.json(
         {
           error: 'Query execution failed',
@@ -287,6 +318,7 @@ chatRoute.post('/', async (c) => {
       );
     }
 
+    log({ level: 'error', event: 'chat.error', errorType: 'unknown', errorMessage: 'Unknown error' });
     return c.json({ error: 'Unknown error' }, 500);
   }
 });
