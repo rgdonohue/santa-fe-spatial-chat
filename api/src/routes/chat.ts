@@ -66,20 +66,23 @@ export function setLayerRegistry(registry: LayerRegistry): void {
 function generateDynamicSuggestions(availableLayers: string[]): string[] {
   const suggestions: string[] = [];
 
-  if (availableLayers.includes('short_term_rentals') && availableLayers.includes('neighborhoods')) {
-    suggestions.push('Try: "Which neighborhoods have the most short-term rentals?"');
+  if (availableLayers.includes('short_term_rentals') && availableLayers.includes('parks')) {
+    suggestions.push('Try: "Short-term rental permits near parks"');
   }
   if (availableLayers.includes('parcels') && availableLayers.includes('transit_access')) {
-    suggestions.push('Try: "Show residential parcels within 300m of a bus stop"');
+    suggestions.push('Try: "Parcels near transit stops"');
   }
   if (availableLayers.includes('census_tracts')) {
     suggestions.push('Try: "Census tracts where median income is below 40000"');
+  }
+  if (availableLayers.includes('parks')) {
+    suggestions.push('Try: "Parks larger than 10 acres"');
   }
   if (availableLayers.includes('parcels') && availableLayers.includes('flood_zones')) {
     suggestions.push('Try: "Parcels that intersect flood zones"');
   }
   if (availableLayers.includes('parcels')) {
-    suggestions.push('Try: "Show parcels built after 2010 with assessed value over 500000"');
+    suggestions.push('Try: "Parcels with assessed value over 1 million dollars"');
   }
 
   if (suggestions.length === 0) {

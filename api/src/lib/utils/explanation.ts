@@ -44,7 +44,7 @@ const OP_DISPLAY_NAMES: Record<string, string> = {
 // ── Equity context hints keyed by layer ────────────────────────────
 const EQUITY_CONTEXT: Record<string, string> = {
   parcels:
-    'Property values and land ownership patterns in Santa Fe reflect historical inequities. Consider how assessed values correlate with neighborhood demographics and displacement pressures.',
+    'Property values in Santa Fe reflect historical inequities. Consider how assessed values correlate with neighborhood demographics, investment patterns, and displacement pressure.',
   short_term_rentals:
     'Short-term rental proliferation can reduce long-term housing supply, driving up rents and displacing established communities, particularly lower-income and historically Hispanic neighborhoods.',
   census_tracts:

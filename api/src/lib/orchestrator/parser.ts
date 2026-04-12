@@ -278,14 +278,6 @@ Output only the JSON object, no other text:`;
   "selectLayer": "parcels"
 }
 
-User: "Show residential parcels"
-{
-  "selectLayer": "parcels",
-  "attributeFilters": [
-    {"field": "land_use", "op": "like", "value": "%RESIDENTIAL%"}
-  ]
-}
-
 User: "Parcels with assessed value over 500000"
 {
   "selectLayer": "parcels",
@@ -294,17 +286,11 @@ User: "Parcels with assessed value over 500000"
   ]
 }
 
-User: "Show vacant lots"
+User: "Parcels on Main Street"
 {
   "selectLayer": "parcels",
-  "spatialFilters": [
-    {
-      "op": "within",
-      "targetLayer": "parcels"
-    }
-  ],
   "attributeFilters": [
-    {"field": "land_use", "op": "like", "value": "%VACANT%"}
+    {"field": "address", "op": "like", "value": "%Main St%"}
   ]
 }`);
     }
@@ -321,22 +307,6 @@ User: "Show buildings taller than 30 feet"
   "selectLayer": "building_footprints",
   "attributeFilters": [
     {"field": "height", "op": "gt", "value": 30}
-  ]
-}
-
-User: "Buildings built after 2020"
-{
-  "selectLayer": "building_footprints",
-  "attributeFilters": [
-    {"field": "year_built", "op": "gt", "value": 2020}
-  ]
-}
-
-User: "Commercial buildings"
-{
-  "selectLayer": "building_footprints",
-  "attributeFilters": [
-    {"field": "building_type", "op": "like", "value": "%COMMERCIAL%"}
   ]
 }`);
     }
@@ -418,7 +388,10 @@ User: "Census tracts ordered by population"
 
 User: "Show all arroyos"
 {
-  "selectLayer": "hydrology"
+  "selectLayer": "hydrology",
+  "attributeFilters": [
+    {"field": "type", "op": "eq", "value": "ARROYO"}
+  ]
 }`);
     }
 
@@ -458,11 +431,11 @@ User: "Show all arroyos"
   "selectLayer": "transit_access"
 }
 
-User: "Show wheelchair accessible stops"
+User: "Show bus stops"
 {
   "selectLayer": "transit_access",
   "attributeFilters": [
-    {"field": "wheelchair_accessible", "op": "eq", "value": true}
+    {"field": "stop_type", "op": "eq", "value": "bus"}
   ]
 }`);
     }
@@ -488,33 +461,50 @@ User: "Show wheelchair accessible stops"
   "selectLayer": "short_term_rentals"
 }
 
-User: "Short-term rentals near downtown"
+User: "Short-term rental permits issued in 2025"
+{
+  "selectLayer": "short_term_rentals",
+  "attributeFilters": [
+    {"field": "permit_issued_date", "op": "like", "value": "2025%"}
+  ]
+}
+
+User: "Short-term rental permits by business name"
+{
+  "selectLayer": "short_term_rentals",
+  "aggregate": {
+    "groupBy": ["business_name"],
+    "metrics": [{"field": "*", "op": "count", "alias": "permit_count"}]
+  }
+}`);
+    }
+
+    if (hasLayer('short_term_rentals') && hasLayer('parks')) {
+      examples.push(`User: "Short-term rental permits near parks"
 {
   "selectLayer": "short_term_rentals",
   "spatialFilters": [
     {
       "op": "within_distance",
-      "targetLayer": "census_tracts",
-      "distance": 1000
+      "targetLayer": "parks",
+      "distance": 500
     }
   ]
-}
+}`);
+    }
 
-User: "STR permits issued in 2024"
+    if (hasLayer('short_term_rentals') && hasLayer('neighborhoods')) {
+      examples.push(`User: "Short-term rental permits near downtown"
 {
   "selectLayer": "short_term_rentals",
-  "attributeFilters": [
-    {"field": "permit_issued_date", "op": "like", "value": "2024%"}
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "neighborhoods",
+      "targetFilter": [{"field": "name", "op": "like", "value": "%Downtown%"}],
+      "distance": 500
+    }
   ]
-}
-
-User: "Short-term rentals by neighborhood"
-{
-  "selectLayer": "short_term_rentals",
-  "aggregate": {
-    "groupBy": ["address"],
-    "metrics": [{"field": "*", "op": "count", "alias": "str_count"}]
-  }
 }`);
     }
 
@@ -590,6 +580,20 @@ User: "Parcels in a specific neighborhood"
       "op": "within",
       "targetLayer": "neighborhoods",
       "targetFilter": [{"field": "name", "op": "like", "value": "%Downtown%"}]
+    }
+  ]
+}`);
+    }
+
+    if (hasLayer('neighborhoods') && hasLayer('flood_zones')) {
+      examples.push(`User: "Neighborhoods near flood zones"
+{
+  "selectLayer": "neighborhoods",
+  "spatialFilters": [
+    {
+      "op": "within_distance",
+      "targetLayer": "flood_zones",
+      "distance": 250
     }
   ]
 }`);

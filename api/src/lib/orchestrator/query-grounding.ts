@@ -63,7 +63,7 @@ function rewriteZoningFilter(
     if (booleanValue) {
       return {
         rewritten: { field: 'zone_code', op: 'like', value: 'R%' },
-        note: 'Mapped allows_residential=true to zone_code LIKE R%',
+        note: 'Mapped allows_residential=true to a case-insensitive zone_code match on R%',
       };
     }
     throw new Error(
@@ -81,19 +81,12 @@ function rewriteZoningFilter(
     if (booleanValue) {
       return {
         rewritten: { field: 'zone_code', op: 'like', value: 'C%' },
-        note: 'Mapped allows_commercial=true to zone_code LIKE C%',
+        note: 'Mapped allows_commercial=true to a case-insensitive zone_code match on C%',
       };
     }
     throw new Error(
       'zoning_districts.allows_commercial=false is not currently supported'
     );
-  }
-
-  if (filter.field === 'description') {
-    return {
-      rewritten: { ...filter, field: 'zone_name' },
-      note: 'Mapped zoning description to zone_name',
-    };
   }
 
   return { rewritten: filter };

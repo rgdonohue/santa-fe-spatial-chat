@@ -88,6 +88,16 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values)).sort();
 }
 
+function getQueryableFields(
+  schemaFields: Record<string, FieldType>,
+  loadedFields: string[],
+  virtualFields: string[]
+): string[] {
+  const schemaFieldNames = new Set(Object.keys(schemaFields));
+  const concreteFields = loadedFields.filter((field) => schemaFieldNames.has(field));
+  return unique([...concreteFields, ...virtualFields]);
+}
+
 export async function buildLayerRegistry(
   db: Database,
   manifestPath: string
@@ -112,7 +122,11 @@ export async function buildLayerRegistry(
     );
     const loadedFields = unique([...manifestFields, ...describedFields]);
     const virtualFields = VIRTUAL_FIELDS[layerName] ?? [];
-    const queryableFields = unique([...loadedFields, ...virtualFields]);
+    const queryableFields = getQueryableFields(
+      schema.fields,
+      loadedFields,
+      virtualFields
+    );
 
     layers[layerName] = {
       name: layerName,

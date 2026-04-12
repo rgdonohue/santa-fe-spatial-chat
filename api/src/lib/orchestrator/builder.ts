@@ -17,6 +17,10 @@ interface QueryBuilderOptions {
   simplifyToleranceDeg?: number;
 }
 
+const VIRTUAL_FIELDS: Record<string, string[]> = {
+  zoning_districts: ['allows_residential', 'allows_commercial'],
+};
+
 /**
  * Query builder that converts StructuredQuery to SQL
  */
@@ -107,15 +111,14 @@ export class QueryBuilder {
         }
       }
     } else {
-      // Regular query: select specified fields or all (excluding internal geom columns)
+      // Regular query: select specified fields or the audited schema fields
       if (this.query.selectFields && this.query.selectFields.length > 0) {
         const selectFields = this.query.selectFields.map((f) =>
           this.escapeIdentifier(f)
         );
         fields.push(...selectFields);
       } else {
-        // Exclude the internal geometry columns (they'll be output as GeoJSON)
-        fields.push('* EXCLUDE (geom_4326, geom_utm13)');
+        fields.push(...this.getDefaultSelectFields(this.query.selectLayer));
       }
     }
 
@@ -199,7 +202,7 @@ export class QueryBuilder {
         // Non-array fallback (single value)
         return `${field} = ${param}`;
       case 'like':
-        return `${field} LIKE ${param}`;
+        return `${field} ILIKE ${param}`;
       default:
         throw new Error(`Unsupported attribute operation: ${filter.op}`);
     }
@@ -320,6 +323,18 @@ export class QueryBuilder {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
+  private getDefaultSelectFields(layerName: string): string[] {
+    const schema = LAYER_SCHEMAS[layerName];
+    if (!schema) {
+      return ['* EXCLUDE (geom_4326, geom_utm13)'];
+    }
+
+    const virtualFields = new Set(VIRTUAL_FIELDS[layerName] ?? []);
+    return Object.keys(schema.fields)
+      .filter((field) => !virtualFields.has(field))
+      .map((field) => this.escapeIdentifier(field));
+  }
+
   /**
    * Build query for nearest neighbor operations
    * Uses proper k-NN with ORDER BY distance LIMIT
@@ -348,7 +363,7 @@ export class QueryBuilder {
       );
       fields.push(...selectFields);
     } else {
-      fields.push('* EXCLUDE (geom_4326, geom_utm13)');
+      fields.push(...this.getDefaultSelectFields(this.query.selectLayer));
     }
     
     // Add distance calculation

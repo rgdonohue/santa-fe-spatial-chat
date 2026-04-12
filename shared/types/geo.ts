@@ -12,14 +12,15 @@ import type {
 
 /**
  * Parcel properties from Santa Fe County Assessor
+ *
+ * County parcel zoning, land use, and year built are not queryable here because
+ * the current parcel source does not contain reliable values for those fields.
+ * Restoring them requires a County Assessor source with authoritative attributes.
  */
 export interface ParcelProperties {
   parcel_id: string;
   address: string | null;
-  zoning: string;
-  land_use: string;
   acres: number;
-  year_built: number | null;
   assessed_value: number | null;
 }
 
@@ -54,8 +55,8 @@ export type CensusTractCollection = FeatureCollection<
  */
 export interface HydrologyProperties {
   name: string;
-  type: 'river' | 'stream' | 'arroyo' | 'acequia';
-  length_km: number;
+  type: 'ARROYO' | 'ACEQUIA' | 'CANADA' | 'CREEK' | 'SPRINGS';
+  length_km: number; // Legacy field name; current values are meters, not kilometers.
 }
 
 export type HydrologyFeature = Feature<LineString, HydrologyProperties>;
@@ -70,11 +71,9 @@ export type HydrologyCollection = FeatureCollection<
 export interface ZoningDistrictProperties {
   zone_code: string;
   zone_name: string;
-  description: string | null;
+  // Virtual fields rewritten in query-grounding.ts to zone_code filters.
   allows_residential: boolean;
   allows_commercial: boolean;
-  min_lot_size_acres: number | null;
-  max_density_units_per_acre: number | null;
 }
 
 export type ZoningDistrictFeature = Feature<Polygon, ZoningDistrictProperties>;
@@ -89,11 +88,8 @@ export type ZoningDistrictCollection = FeatureCollection<
 export interface BuildingFootprintProperties {
   building_id: string;
   address: string | null;
-  building_type: string | null;
   height: number | null; // Height in feet
-  year_built: number | null;
   source: string | null; // Data source (e.g., "LIDAR", "SURVEY")
-  source_year: number | null;
 }
 
 export type BuildingFootprintFeature = Feature<Polygon, BuildingFootprintProperties>;
@@ -107,18 +103,12 @@ export type BuildingFootprintCollection = FeatureCollection<
 // ============================================================================
 
 /**
- * Short-term rental properties (Airbnb/VRBO or permit data)
+ * Short-term rental permit properties.
+ *
+ * This layer reflects City permit records, not listing-scrape data.
  */
 export interface ShortTermRentalProperties {
   listing_id: string;
-  host_id: string | null;
-  property_type: string;
-  room_type: string | null;
-  accommodates: number | null;
-  price_per_night: number | null;
-  availability_365: number | null; // days available per year
-  last_scraped: string | null; // ISO date string
-  source: 'airbnb' | 'vrbo' | 'other';
   address: string | null; // Full address
   business_name: string | null; // DBA or business name
   permit_issued_date: string | null; // ISO date string (YYYY-MM-DD)
@@ -157,9 +147,9 @@ export interface AffordableHousingProperties {
   address: string;
   total_units: number;
   affordable_units: number;
-  income_restriction_pct_ami: number | null; // % of Area Median Income
+  income_restriction_pct_ami: number | null; // % of Area Median Income; mostly null in current data.
   deed_restricted: boolean;
-  restriction_expires: string | null; // ISO date string
+  restriction_expires: string | null; // ISO date string; currently null for all records.
   property_type: 'apartment' | 'townhouse' | 'single_family' | 'other';
 }
 
@@ -197,12 +187,7 @@ export type EvictionFilingCollection = FeatureCollection<
  */
 export interface TransitAccessProperties {
   stop_id: string;
-  stop_name: string;
-  route_ids: string[]; // Array of route identifiers
-  route_names: string[];
   stop_type: 'bus' | 'rail' | 'other';
-  wheelchair_accessible: string | null;
-  avg_headway_minutes: number | null;
 }
 
 export type TransitAccessFeature = Feature<Point, TransitAccessProperties>;
@@ -235,8 +220,6 @@ export interface HistoricDistrictProperties {
   district_id: string;
   district_name: string;
   designation_type: 'national' | 'state' | 'local';
-  designation_date: string | null; // ISO date string
-  restrictions: string[]; // Array of restriction descriptions
 }
 
 export type HistoricDistrictFeature = Feature<
@@ -255,8 +238,8 @@ export interface FloodZoneProperties {
   zone_id: string;
   zone_code: string; // e.g., "AE", "X", "A"
   zone_name: string;
-  flood_risk_level: 'high' | 'moderate' | 'low' | 'minimal';
-  base_flood_elevation: number | null; // feet
+  flood_risk_level: 'high' | 'moderate' | 'low' | 'minimal'; // Current dataset is all "high".
+  base_flood_elevation: number | null; // Feet; FEMA uses -9999 as a no-data sentinel in current source data.
   source: 'fema_nfhl';
 }
 
@@ -324,8 +307,6 @@ export interface ParkProperties {
   park_type: string;
   owner: string;
   acres: number | null;
-  trail_miles: number | null;
-  status: string | null;
   council_district: string | null;
 }
 
@@ -338,9 +319,6 @@ export type ParkCollection = FeatureCollection<Polygon, ParkProperties>;
 export interface BikewayProperties {
   bikeway_id: string;
   name: string | null;
-  bikeway_type: string;
-  surface: string | null;
-  length_miles: number | null;
 }
 
 export type BikewayFeature = Feature<LineString, BikewayProperties>;
@@ -384,10 +362,7 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
     fields: {
       parcel_id: 'string',
       address: 'string | null',
-      zoning: 'string',
-      land_use: 'string',
       acres: 'number',
-      year_built: 'number | null',
       assessed_value: 'number | null',
     },
   },
@@ -411,10 +386,11 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
   hydrology: {
     name: 'hydrology',
     geometryType: 'LineString',
-    description: 'Rivers, streams, arroyos, and acequias',
+    description:
+      'Hydrology lines; type values are uppercase and length_km values are stored in meters despite the legacy field name.',
     fields: {
       name: 'string',
-      type: 'string', // 'river' | 'stream' | 'arroyo' | 'acequia'
+      type: 'string', // 'ARROYO' | 'ACEQUIA' | 'CANADA' | 'CREEK' | 'SPRINGS'
       length_km: 'number',
     },
   },
@@ -425,41 +401,29 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
     fields: {
       zone_code: 'string',
       zone_name: 'string',
-      description: 'string | null',
+      // Virtual rewrites handled in query-grounding.ts.
       allows_residential: 'boolean',
       allows_commercial: 'boolean',
-      min_lot_size_acres: 'number | null',
-      max_density_units_per_acre: 'number | null',
     },
   },
   building_footprints: {
     name: 'building_footprints',
     geometryType: 'Polygon',
-    description: 'Building footprints with height and type information',
+    description: 'Building footprints with height and source information',
     fields: {
       building_id: 'string',
       address: 'string | null',
-      building_type: 'string | null',
       height: 'number | null',
-      year_built: 'number | null',
       source: 'string | null',
-      source_year: 'number | null',
     },
   },
   short_term_rentals: {
     name: 'short_term_rentals',
     geometryType: 'Point',
-    description: 'Short-term rental listings and permits (Airbnb/VRBO or City permits)',
+    description:
+      'City short-term rental permit records; this is permit data, not listing-scrape data.',
     fields: {
       listing_id: 'string',
-      host_id: 'string | null',
-      property_type: 'string',
-      room_type: 'string | null',
-      accommodates: 'number | null',
-      price_per_night: 'number | null',
-      availability_365: 'number | null',
-      last_scraped: 'string | null',
-      source: 'string', // 'airbnb' | 'vrbo' | 'other'
       address: 'string | null',
       business_name: 'string | null',
       permit_issued_date: 'string | null',
@@ -488,9 +452,9 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       address: 'string',
       total_units: 'number',
       affordable_units: 'number',
-      income_restriction_pct_ami: 'number | null',
+      income_restriction_pct_ami: 'number | null', // Mostly null in current data.
       deed_restricted: 'boolean',
-      restriction_expires: 'string | null',
+      restriction_expires: 'string | null', // Currently null in current data.
       property_type: 'string', // 'apartment' | 'townhouse' | 'single_family' | 'other'
     },
   },
@@ -514,12 +478,7 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
     description: 'Transit stops and stations',
     fields: {
       stop_id: 'string',
-      stop_name: 'string',
-      route_ids: 'string[]',
-      route_names: 'string[]',
       stop_type: 'string', // 'bus' | 'rail' | 'other'
-      wheelchair_accessible: 'string | null',
-      avg_headway_minutes: 'number | null',
     },
   },
   school_zones: {
@@ -542,14 +501,13 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       district_id: 'string',
       district_name: 'string',
       designation_type: 'string', // 'national' | 'state' | 'local'
-      designation_date: 'string | null',
-      restrictions: 'string[]',
     },
   },
   flood_zones: {
     name: 'flood_zones',
     geometryType: 'Polygon',
-    description: 'FEMA flood hazard zones',
+    description:
+      'FEMA flood hazard zones; flood_risk_level is currently all "high" and base_flood_elevation may use -9999 as a no-data sentinel.',
     fields: {
       zone_id: 'string',
       zone_code: 'string',
@@ -603,8 +561,6 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
       park_type: 'string',
       owner: 'string',
       acres: 'number | null',
-      trail_miles: 'number | null',
-      status: 'string | null',
       council_district: 'string | null',
     },
   },
@@ -615,9 +571,6 @@ export const LAYER_SCHEMAS: Record<string, LayerSchema> = {
     fields: {
       bikeway_id: 'string',
       name: 'string | null',
-      bikeway_type: 'string',
-      surface: 'string | null',
-      length_miles: 'number | null',
     },
   },
 } as const;
@@ -638,8 +591,6 @@ export function isParcelFeature(
     typeof props === 'object' &&
     props !== null &&
     typeof props.parcel_id === 'string' &&
-    typeof props.zoning === 'string' &&
-    typeof props.land_use === 'string' &&
     typeof props.acres === 'number'
   );
 }
@@ -674,7 +625,7 @@ export function isHydrologyFeature(
     props !== null &&
     typeof props.name === 'string' &&
     typeof props.type === 'string' &&
-    ['river', 'stream', 'arroyo', 'acequia'].includes(props.type) &&
+    ['ARROYO', 'ACEQUIA', 'CANADA', 'CREEK', 'SPRINGS'].includes(props.type) &&
     typeof props.length_km === 'number'
   );
 }
@@ -690,8 +641,7 @@ export function isShortTermRentalFeature(
   return (
     typeof props === 'object' &&
     props !== null &&
-    typeof props.listing_id === 'string' &&
-    typeof props.property_type === 'string'
+    typeof props.listing_id === 'string'
   );
 }
 
@@ -760,8 +710,7 @@ export function isTransitAccessFeature(
     typeof props === 'object' &&
     props !== null &&
     typeof props.stop_id === 'string' &&
-    typeof props.stop_name === 'string' &&
-    Array.isArray(props.route_ids)
+    typeof props.stop_type === 'string'
   );
 }
 
@@ -901,4 +850,3 @@ export type AnyProperties =
  * Layer name type (keys of LAYER_SCHEMAS)
  */
 export type LayerName = keyof typeof LAYER_SCHEMAS;
-

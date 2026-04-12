@@ -56,7 +56,7 @@ const CONCEPT_RULES: ConceptRule[] = [
     patterns: [/\bvacancy status\b/i, /\busps vacancy\b/i, /\blong[- ]term vacancy\b/i],
     requiredLayers: ['vacancy_status'],
     suggestion:
-      'Vacancy status layer is not loaded yet. Try vacant parcels using parcel land_use filters.',
+      'Vacancy status layer is not loaded yet. Try parcels by assessed value or spatial proximity to transit, parks, or flood zones.',
   },
 ];
 

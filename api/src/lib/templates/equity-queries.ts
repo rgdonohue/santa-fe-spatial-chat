@@ -29,23 +29,20 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
   // DISPLACEMENT PRESSURE
   // ============================================================================
   {
-    id: 'str-density-by-tract',
-    name: 'Short-Term Rental Density by Census Tract',
+    id: 'str-permits-issued-2025',
+    name: 'Short-Term Rental Permits Issued in 2025',
     description:
-      'Identifies census tracts with high concentrations of short-term rentals, which may indicate displacement pressure on long-term residents.',
+      'Identifies recently issued short-term rental permits, which can signal areas where long-term housing supply may face added pressure.',
     category: 'displacement',
     query: {
       selectLayer: 'short_term_rentals',
-      aggregate: {
-        groupBy: ['census_tract_geoid'],
-        metrics: [
-          { field: '*', op: 'count', alias: 'str_count' },
-          { field: 'price_per_night', op: 'avg', alias: 'avg_price' },
-        ],
-      },
+      attributeFilters: [
+        { field: 'permit_issued_date', op: 'like', value: '2025%' },
+      ],
+      orderBy: { field: 'permit_issued_date', direction: 'desc' },
     },
     explanation:
-      'High STR density can reduce available housing for residents and drive up rents. Compare with median income to identify equity concerns.',
+      'Recent STR permitting can reduce housing available to residents and intensify displacement pressure in nearby neighborhoods.',
     dataRequirements: ['short_term_rentals'],
   },
 
@@ -157,15 +154,15 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
   },
 
   {
-    id: 'vacant-near-transit',
-    name: 'Vacant Parcels Near Transit (Development Opportunity)',
+    id: 'high-value-near-transit',
+    name: 'High-Value Parcels Near Transit',
     description:
-      'Identifies vacant or underutilized parcels near transit that could support affordable housing development.',
+      'Identifies higher-value parcels near transit, which can help surface areas where investment pressure and accessibility overlap.',
     category: 'opportunity',
     query: {
       selectLayer: 'parcels',
       attributeFilters: [
-        { field: 'land_use', op: 'like', value: '%vacant%' },
+        { field: 'assessed_value', op: 'gt', value: 500000 },
       ],
       spatialFilters: [
         {
@@ -176,7 +173,7 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
       ],
     },
     explanation:
-      'Transit-oriented development on vacant parcels can provide affordable housing with lower transportation costs for residents.',
+      'High-value land near transit can indicate places where accessibility benefits are already capitalized into property values, raising affordability concerns.',
     dataRequirements: ['parcels', 'transit_access'],
   },
 
@@ -185,15 +182,12 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
   // ============================================================================
   {
     id: 'flood-risk-low-income',
-    name: 'Flood Risk in Low-Income Census Tracts',
+    name: 'Parcels in Flood Risk Areas Within Low-Income Census Tracts',
     description:
-      'Identifies residential parcels in flood zones within low-income areas.',
+      'Identifies parcels in flood zones within lower-income census tracts.',
     category: 'risk',
     query: {
       selectLayer: 'parcels',
-      attributeFilters: [
-        { field: 'zoning', op: 'in', value: ['R-1', 'R-2', 'R-3', 'R-4'] },
-      ],
       spatialFilters: [
         {
           op: 'intersects',
@@ -217,20 +211,17 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
 
   {
     id: 'arroyo-proximity',
-    name: 'Housing Near Arroyos (Flash Flood Risk)',
+    name: 'Parcels Near Arroyos (Flash Flood Risk)',
     description:
-      'Identifies residential properties near arroyos, which pose flash flood risk in the desert Southwest.',
+      'Identifies parcels near arroyos, which pose flash flood risk in the desert Southwest.',
     category: 'risk',
     query: {
       selectLayer: 'parcels',
-      attributeFilters: [
-        { field: 'zoning', op: 'in', value: ['R-1', 'R-2', 'R-3', 'R-4'] },
-      ],
       spatialFilters: [
         {
           op: 'within_distance',
           targetLayer: 'hydrology',
-          targetFilter: [{ field: 'type', op: 'eq', value: 'arroyo' }],
+          targetFilter: [{ field: 'type', op: 'eq', value: 'ARROYO' }],
           distance: 100, // meters
         },
       ],
@@ -307,16 +298,13 @@ export const EQUITY_TEMPLATES: QueryTemplate[] = [
   },
 
   {
-    id: 'historic-district-housing',
-    name: 'Housing in Historic Districts',
+    id: 'historic-district-parcels',
+    name: 'Parcels in Historic Districts',
     description:
-      'Identifies residential parcels within historic districts, which may face development restrictions.',
+      'Identifies parcels within historic districts, which may face development restrictions.',
     category: 'housing',
     query: {
       selectLayer: 'parcels',
-      attributeFilters: [
-        { field: 'zoning', op: 'in', value: ['R-1', 'R-2', 'R-3', 'R-4'] },
-      ],
       spatialFilters: [
         {
           op: 'within',
