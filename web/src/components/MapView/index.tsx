@@ -25,9 +25,9 @@ const SELECTED_POLYGON_LINE_LAYER = 'selected-feature-polygon-line';
 const SELECTED_LINE_LAYER = 'selected-feature-line';
 const SELECTED_POINT_LAYER = 'selected-feature-point';
 
-// Steelblue color for all features
-const FILL_COLOR = '#4682b4';
-const STROKE_COLOR = '#2c5270';
+// Terracotta color for all features
+const FILL_COLOR = '#C2694A';
+const STROKE_COLOR = '#A0523C';
 
 /**
  * Escape HTML entities to prevent XSS attacks
@@ -70,29 +70,7 @@ export function MapView({
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'carto-light': {
-            type: 'raster',
-            tiles: [
-              'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-              'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-              'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-            ],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          },
-        },
-        layers: [
-          {
-            id: 'carto-light',
-            type: 'raster',
-            source: 'carto-light',
-          },
-        ],
-      },
+      style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
       center: [-105.94, 35.69], // Santa Fe
       zoom: 12,
     });
@@ -115,7 +93,7 @@ export function MapView({
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Fill layer for polygons - steelblue
+      // Fill layer for polygons - terracotta
       m.addLayer({
         id: RESULTS_FILL_LAYER,
         type: 'fill',
@@ -123,7 +101,7 @@ export function MapView({
         filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
           'fill-color': FILL_COLOR,
-          'fill-opacity': 0.4,
+          'fill-opacity': 0.35,
         },
       });
 
@@ -139,7 +117,7 @@ export function MapView({
         },
       });
 
-      // Line layer for LineString features (hydrology, etc.) - steelblue
+      // Line layer for LineString features (hydrology, etc.) - terracotta
       m.addLayer({
         id: RESULTS_LINESTRING_LAYER,
         type: 'line',
@@ -165,15 +143,15 @@ export function MapView({
         },
       });
 
-      // Selected feature highlight layers by geometry type
+      // Selected feature highlight layers by geometry type — ochre/gold
       m.addLayer({
         id: SELECTED_POLYGON_FILL_LAYER,
         type: 'fill',
         source: SELECTED_SOURCE,
         filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
-          'fill-color': '#f59e0b',
-          'fill-opacity': 0.22,
+          'fill-color': '#D4A853',
+          'fill-opacity': 0.25,
         },
       });
 
@@ -183,7 +161,7 @@ export function MapView({
         source: SELECTED_SOURCE,
         filter: ['==', ['geometry-type'], 'Polygon'],
         paint: {
-          'line-color': '#f59e0b',
+          'line-color': '#B8912E',
           'line-width': 4,
         },
       });
@@ -194,7 +172,7 @@ export function MapView({
         source: SELECTED_SOURCE,
         filter: ['==', ['geometry-type'], 'LineString'],
         paint: {
-          'line-color': '#f59e0b',
+          'line-color': '#B8912E',
           'line-width': 4,
         },
       });
@@ -206,9 +184,9 @@ export function MapView({
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
           'circle-radius': 10,
-          'circle-color': '#f59e0b',
+          'circle-color': '#D4A853',
           'circle-opacity': 0.3,
-          'circle-stroke-color': '#b45309',
+          'circle-stroke-color': '#B8912E',
           'circle-stroke-width': 3,
         },
       });
@@ -391,9 +369,9 @@ export function MapView({
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', colorExpr as maplibregl.ExpressionSpecification);
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.7);
       } else {
-        // Reset to default steelblue
+        // Reset to default terracotta
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', FILL_COLOR);
-        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.4);
+        m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.35);
       }
     };
 

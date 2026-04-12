@@ -14,14 +14,15 @@
   position: absolute;
   bottom: 24px;
   left: 12px;
-  background: var(--panel-bg, rgba(26, 26, 46, 0.95));
+  background: rgba(250, 247, 242, 0.96);
   border-radius: 8px;
   font-size: 0.8rem;
-  color: var(--text-primary, #fff);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary, #2D2A26);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   max-width: 200px;
   max-height: 300px;
   overflow: hidden;
+  border: 1px solid var(--border-color, #E0D9CE);
 }
 
 .map-legend.collapsed {
@@ -34,19 +35,20 @@
   gap: 0.5rem;
   padding: 0.6rem 0.75rem;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color, #2a2a4a);
+  border-bottom: 1px solid var(--border-color, #E0D9CE);
   user-select: none;
 }
 
 .legend-header:hover {
-  background: var(--hover-bg, rgba(255, 255, 255, 0.05));
+  background: var(--hover-bg, rgba(61, 139, 132, 0.06));
 }
 
 .legend-title {
   flex: 1;
   font-weight: 600;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-color, #2a2a4a);
+  border-bottom: 1px solid var(--border-color, #E0D9CE);
+  color: var(--text-primary, #2D2A26);
 }
 
 .legend-scale {
@@ -54,7 +56,7 @@
 }
 
 .legend-count {
-  background: var(--accent-color, #6366f1);
+  background: var(--accent-color, #3D8B84);
   color: #fff;
   padding: 0.15rem 0.4rem;
   border-radius: 10px;
@@ -84,7 +86,7 @@
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
 
@@ -93,28 +95,29 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.75rem;
+  color: var(--text-primary, #2D2A26);
 }
 
 .legend-more {
   padding: 0.4rem 0 0.2rem;
   font-size: 0.7rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary, #6B635A);
   font-style: italic;
 }
 
 /* Tooltip styles */
 .map-tooltip .maplibregl-popup-content {
-  background: var(--panel-bg, rgba(26, 26, 46, 0.95));
-  color: var(--text-primary, #fff);
+  background: rgba(250, 247, 242, 0.97);
+  color: var(--text-primary, #2D2A26);
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   font-size: 0.8rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color, #2a2a4a);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border-color, #E0D9CE);
 }
 
 .map-tooltip .maplibregl-popup-tip {
-  border-top-color: var(--panel-bg, rgba(26, 26, 46, 0.95));
+  border-top-color: rgba(250, 247, 242, 0.97);
 }
 
 .tooltip-content {
@@ -126,13 +129,13 @@
 }
 
 .tooltip-row strong {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary, #6B635A);
   font-weight: 500;
 }
 
 .tooltip-desc {
   font-size: 0.75rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary, #6B635A);
   margin-top: 0.2rem;
   max-width: 200px;
   white-space: normal;
@@ -140,20 +143,17 @@
 
 /* MapLibre GL controls styling */
 .maplibregl-ctrl-group {
-  background: var(--panel-bg, #1a1a2e) !important;
+  background: rgba(250, 247, 242, 0.96) !important;
   border-radius: 8px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid var(--border-color, #E0D9CE) !important;
 }
 
 .maplibregl-ctrl-group button {
   background: transparent !important;
-  border-bottom-color: var(--border-color, #2a2a4a) !important;
+  border-bottom-color: var(--border-color, #E0D9CE) !important;
 }
 
 .maplibregl-ctrl-group button:hover {
-  background: var(--hover-bg, rgba(99, 102, 241, 0.2)) !important;
-}
-
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(1);
+  background: var(--hover-bg, rgba(61, 139, 132, 0.08)) !important;
 }

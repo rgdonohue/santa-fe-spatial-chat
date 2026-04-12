@@ -44,9 +44,9 @@ export function ChatPanel({
   };
 
   const exampleQueries = [
-    'Which neighborhoods have the most short-term rentals?',
-    'Show residential parcels within 300m of a bus stop',
-    'Census tracts where median income is below 40000',
+    { category: 'HOUSING', query: 'Which neighborhoods have the most short-term rentals?' },
+    { category: 'TRANSIT', query: 'Show residential parcels within 300m of a bus stop' },
+    { category: 'EQUITY', query: 'Census tracts where median income is below 40000' },
   ];
 
   return (
@@ -70,15 +70,16 @@ export function ChatPanel({
               Ask a question about Santa Fe in plain English. For example:
             </p>
             <ul className="example-queries">
-              {exampleQueries.map((query, i) => (
-                <li key={i}>
+              {exampleQueries.map(({ category, query }, i) => (
+                <li key={i} className="example-query-item">
+                  <span className="example-query-category">{category}</span>
                   <button
                     type="button"
                     className="example-query-btn"
                     onClick={() => setInputValue(query)}
                     disabled={isLoading}
                   >
-                    "{query}"
+                    {query}
                   </button>
                 </li>
               ))}
@@ -151,8 +152,9 @@ export function ChatPanel({
           type="submit"
           className="chat-submit-btn"
           disabled={!inputValue.trim() || isLoading}
+          aria-label={isLoading ? 'Processing query' : 'Send message'}
         >
-          {isLoading ? 'Thinking...' : 'Send'}
+          →
         </button>
       </form>
     </div>

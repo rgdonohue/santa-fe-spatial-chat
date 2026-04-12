@@ -1,47 +1,25 @@
-/* CSS Variables for theming */
+/* CSS Variables for theming — warm light theme */
 :root {
-  --panel-bg: #1a1a2e;
-  --border-color: #2a2a4a;
-  --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --text-tertiary: #555555;
-  --accent-color: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-secondary: #f59e0b;
-  --hover-bg: rgba(99, 102, 241, 0.1);
-  --input-bg: #0f0f1a;
-  --message-bg: #2a2a4a;
-  --badge-bg: #2a2a4a;
-  --code-bg: #0f0f1a;
-  --explanation-bg: rgba(99, 102, 241, 0.1);
-  --selected-bg: rgba(245, 158, 11, 0.1);
-  --table-header-bg: #2a2a4a;
-  --row-hover-bg: rgba(99, 102, 241, 0.1);
-  --row-selected-bg: rgba(245, 158, 11, 0.2);
-}
-
-/* Light mode */
-@media (prefers-color-scheme: light) {
-  :root {
-    --panel-bg: #f8fafc;
-    --border-color: #e2e8f0;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-tertiary: #94a3b8;
-    --accent-color: #6366f1;
-    --accent-hover: #4f46e5;
-    --accent-secondary: #f59e0b;
-    --hover-bg: rgba(99, 102, 241, 0.1);
-    --input-bg: #ffffff;
-    --message-bg: #e2e8f0;
-    --badge-bg: #e2e8f0;
-    --code-bg: #f1f5f9;
-    --explanation-bg: rgba(99, 102, 241, 0.1);
-    --selected-bg: rgba(245, 158, 11, 0.15);
-    --table-header-bg: #f1f5f9;
-    --row-hover-bg: rgba(99, 102, 241, 0.08);
-    --row-selected-bg: rgba(245, 158, 11, 0.15);
-  }
+  --panel-bg: #FAF7F2;
+  --app-bg: #F0EBE1;
+  --border-color: #E0D9CE;
+  --text-primary: #2D2A26;
+  --text-secondary: #6B635A;
+  --text-tertiary: #9A8F87;
+  --accent-color: #3D8B84;
+  --accent-hover: #2E6E68;
+  --accent-secondary: #C2694A;
+  --accent-tertiary: #7A8B6F;
+  --hover-bg: rgba(61, 139, 132, 0.06);
+  --input-bg: #FFFFFF;
+  --message-bg: #FAF7F2;
+  --badge-bg: #C2694A;
+  --code-bg: #F5F0E8;
+  --explanation-bg: rgba(61, 139, 132, 0.06);
+  --selected-bg: rgba(212, 168, 83, 0.12);
+  --table-header-bg: #F5F0E8;
+  --row-hover-bg: rgba(61, 139, 132, 0.06);
+  --row-selected-bg: rgba(212, 168, 83, 0.18);
 }
 
 /* Main layout */
@@ -50,6 +28,7 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  background: var(--app-bg);
 }
 
 .app-sidebar {
@@ -58,6 +37,7 @@
   flex-shrink: 0;
   height: 100%;
   overflow: hidden;
+  border-right: 1px solid var(--border-color);
 }
 
 .app-main {
@@ -72,6 +52,7 @@
   flex-shrink: 0;
   height: 100%;
   overflow: hidden;
+  border-left: 1px solid var(--border-color);
 }
 
 /* Responsive adjustments */
@@ -112,6 +93,6 @@
     max-width: 400px;
     height: 100%;
     z-index: 1000;
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
   }
 }
