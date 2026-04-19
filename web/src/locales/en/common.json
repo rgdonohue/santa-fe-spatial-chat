@@ -1,0 +1,75 @@
+{
+  "app": {
+    "title": "Parcela",
+    "subtitle": "Explore Santa Fe housing, land use, and equity"
+  },
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "spanish": "Español",
+    "switchToEnglish": "Switch to English",
+    "switchToSpanish": "Cambiar a español"
+  },
+  "chat": {
+    "regionLabel": "Chat",
+    "conversationHistory": "Conversation history",
+    "welcomeIntro": "Ask a question about Santa Fe in plain English. For example:",
+    "inputLabel": "Ask a question about Santa Fe",
+    "inputPlaceholder": "Ask a question about Santa Fe…",
+    "loadingResponse": "Loading response",
+    "processingQuery": "Processing your query…",
+    "processingQueryHint": "Please wait, processing your query",
+    "send": "Send message",
+    "sending": "Processing query",
+    "equityLabel": "Housing equity analysis",
+    "featuresFound": "{{count}} features found in {{ms}} ms"
+  },
+  "examples": {
+    "categories": {
+      "equity": "equity",
+      "transit": "transit",
+      "housing": "housing",
+      "landUse": "land use",
+      "water": "water"
+    },
+    "queries": [
+      { "category": "equity", "query": "Census tracts where median income is below $40,000" },
+      { "category": "landUse", "query": "Parks larger than 10 acres" },
+      { "category": "housing", "query": "Short-term rental permits near downtown" },
+      { "category": "housing", "query": "Parcels with assessed value over $1 million" },
+      { "category": "water", "query": "Parcels within 200 meters of an arroyo and inside a flood zone" },
+      { "category": "transit", "query": "Affordable housing within 800 meters of a bus stop" }
+    ]
+  },
+  "results": {
+    "regionLabel": "Query results",
+    "heading": "Results",
+    "featureCount_one": "{{count}} feature",
+    "featureCount_other": "{{count}} features",
+    "close": "Close results",
+    "downloadGeoJsonLabel": "Download results as GeoJSON",
+    "downloadGeoJsonTitle": "Download GeoJSON",
+    "downloadCsvLabel": "Download results as CSV",
+    "downloadCsvTitle": "Download CSV",
+    "sources": "Sources",
+    "queryHash": "Query hash",
+    "grounding": "Grounding",
+    "missing": "Missing",
+    "truncatedAt": "Results truncated at {{count}} features",
+    "viewQuery": "View query",
+    "selectedFeature": "Selected feature",
+    "clearSelection": "Clear",
+    "featureResults": "Feature results",
+    "equityLabel": "Housing equity analysis"
+  },
+  "map": {
+    "legendTitle": "Query results",
+    "tooltipName": "Name"
+  },
+  "errors": {
+    "genericQueryFailed": "Sorry, that query didn't work. Try rephrasing your question.",
+    "noResults": "No results matched your query.",
+    "layerUnavailable": "That data layer isn't loaded yet.",
+    "networkError": "Couldn't reach the server. Check your connection and try again."
+  }
+}

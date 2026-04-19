@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ChatMessage } from '../../types/api';
 import './ChatPanel.css';
 
@@ -13,16 +14,15 @@ export function ChatPanel({
   onSendMessage,
   isLoading,
 }: ChatPanelProps) {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -43,19 +43,14 @@ export function ChatPanel({
     }
   };
 
-  const exampleQueries = [
-    { category: 'equity', query: 'Census tracts where median income is below 40000' },
-    { category: 'transit', query: 'Parks larger than 10 acres' },
-    { category: 'transit', query: 'Short-term rental permits near downtown' },
-    { category: 'housing', query: 'Parcels with assessed value over 1 million dollars' },
-  ];
+  const exampleQueries = t('examples.queries', { returnObjects: true }) as Array<{ category: string; query: string }>;
 
   return (
-    <div className="chat-panel" role="region" aria-label="Chat">
+    <div className="chat-panel" role="region" aria-label={t('chat.regionLabel')}>
       <div className="chat-header">
-        <h2>Parcela</h2>
+        <h2>{t('app.title')}</h2>
         <p className="chat-subtitle">
-          Explore Santa Fe housing, land use, and equity
+          {t('app.subtitle')}
         </p>
       </div>
 
@@ -63,13 +58,11 @@ export function ChatPanel({
         className="chat-messages"
         role="log"
         aria-live="polite"
-        aria-label="Conversation history"
+        aria-label={t('chat.conversationHistory')}
       >
         {messages.length === 0 && (
           <div className="chat-welcome">
-            <p>
-              Ask a question about Santa Fe in plain English. For example:
-            </p>
+            <p>{t('chat.welcomeIntro')}</p>
             <ul className="example-queries">
               {exampleQueries.map(({ category, query }, i) => (
                 <li key={i} className="example-query-item">
@@ -79,7 +72,9 @@ export function ChatPanel({
                     onClick={() => setInputValue(query)}
                     disabled={isLoading}
                   >
-                    <span className={`example-query-tag tag-${category}`}>{category}</span>
+                    <span className={`example-query-tag tag-${category}`}>
+                      {t(`examples.categories.${category}`, { defaultValue: category })}
+                    </span>
                     {query}
                   </button>
                 </li>
@@ -96,7 +91,7 @@ export function ChatPanel({
           >
             <div className="message-content">
               {message.role === 'assistant' && message.equityNarrative && (
-                <span className="chat-equity-label">Housing equity analysis</span>
+                <span className="chat-equity-label">{t('chat.equityLabel')}</span>
               )}
               {message.content}
               {message.error && (
@@ -104,8 +99,10 @@ export function ChatPanel({
               )}
               {message.metadata && (
                 <div className="message-meta">
-                  {message.metadata.count} features found in{' '}
-                  {message.metadata.executionTimeMs}ms
+                  {t('chat.featuresFound', {
+                    count: message.metadata.count,
+                    ms: message.metadata.executionTimeMs,
+                  })}
                 </div>
               )}
             </div>
@@ -113,14 +110,14 @@ export function ChatPanel({
         ))}
 
         {isLoading && (
-          <div className="chat-message assistant" role="status" aria-label="Loading response">
+          <div className="chat-message assistant" role="status" aria-label={t('chat.loadingResponse')}>
             <div className="message-content loading">
               <span className="loading-dots" aria-hidden="true">
                 <span>.</span>
                 <span>.</span>
                 <span>.</span>
               </span>
-              <span className="sr-only">Processing your query...</span>
+              <span className="sr-only">{t('chat.processingQuery')}</span>
             </div>
           </div>
         )}
@@ -130,7 +127,7 @@ export function ChatPanel({
 
       <form className="chat-input-form" onSubmit={handleSubmit}>
         <label htmlFor="chat-input" className="sr-only">
-          Ask a question about Santa Fe
+          {t('chat.inputLabel')}
         </label>
         <textarea
           id="chat-input"
@@ -139,21 +136,21 @@ export function ChatPanel({
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question about Santa Fe..."
+          placeholder={t('chat.inputPlaceholder')}
           disabled={isLoading}
           rows={2}
           aria-describedby={isLoading ? 'chat-loading-hint' : undefined}
         />
         {isLoading && (
           <span id="chat-loading-hint" className="sr-only">
-            Please wait, processing your query
+            {t('chat.processingQueryHint')}
           </span>
         )}
         <button
           type="submit"
           className="chat-submit-btn"
           disabled={!inputValue.trim() || isLoading}
-          aria-label={isLoading ? 'Processing query' : 'Send message'}
+          aria-label={isLoading ? t('chat.sending') : t('chat.send')}
         >
           →
         </button>

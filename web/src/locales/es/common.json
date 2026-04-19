@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "Parcela",
+    "subtitle": "Explora la vivienda, el uso del suelo y la equidad en Santa Fe"
+  },
+  "language": {
+    "label": "Idioma",
+    "english": "English",
+    "spanish": "Español",
+    "switchToEnglish": "Switch to English",
+    "switchToSpanish": "Cambiar a español"
+  },
+  "chat": {
+    "regionLabel": "Conversación",
+    "conversationHistory": "Historial de la conversación",
+    "welcomeIntro": "Haz una pregunta sobre Santa Fe en tus propias palabras. Por ejemplo:",
+    "inputLabel": "Haz una pregunta sobre Santa Fe",
+    "inputPlaceholder": "Haz una pregunta sobre Santa Fe…",
+    "loadingResponse": "Cargando respuesta",
+    "processingQuery": "Procesando tu consulta…",
+    "processingQueryHint": "Por favor espera, estamos procesando tu consulta",
+    "send": "Enviar mensaje",
+    "sending": "Procesando consulta",
+    "equityLabel": "Análisis de equidad en vivienda",
+    "featuresFound": "{{count}} resultados encontrados en {{ms}} ms"
+  },
+  "examples": {
+    "categories": {
+      "equity": "equidad",
+      "transit": "tránsito",
+      "housing": "vivienda",
+      "landUse": "uso del suelo",
+      "water": "agua"
+    },
+    "queries": [
+      { "category": "equity", "query": "Sectores censales donde el ingreso mediano está por debajo de los $40,000" },
+      { "category": "landUse", "query": "Parques de más de 10 acres" },
+      { "category": "housing", "query": "Permisos de alquiler de corto plazo cerca del centro" },
+      { "category": "housing", "query": "Parcelas con valor tasado mayor a $1 millón" },
+      { "category": "water", "query": "Parcelas dentro de 200 metros de un arroyo y en zona inundable" },
+      { "category": "transit", "query": "Vivienda asequible dentro de 800 metros de una parada de autobús" },
+      { "category": "landUse", "query": "Parcelas que colindan con una acequia en Agua Fría" }
+    ]
+  },
+  "results": {
+    "regionLabel": "Resultados de la consulta",
+    "heading": "Resultados",
+    "featureCount_one": "{{count}} resultado",
+    "featureCount_other": "{{count}} resultados",
+    "close": "Cerrar resultados",
+    "downloadGeoJsonLabel": "Descargar resultados como GeoJSON",
+    "downloadGeoJsonTitle": "Descargar GeoJSON",
+    "downloadCsvLabel": "Descargar resultados como CSV",
+    "downloadCsvTitle": "Descargar CSV",
+    "sources": "Fuentes",
+    "queryHash": "Hash de la consulta",
+    "grounding": "Verificación",
+    "missing": "Faltan",
+    "truncatedAt": "Resultados truncados en {{count}} elementos",
+    "viewQuery": "Ver la consulta",
+    "selectedFeature": "Elemento seleccionado",
+    "clearSelection": "Limpiar",
+    "featureResults": "Resultados por elemento",
+    "equityLabel": "Análisis de equidad en vivienda"
+  },
+  "map": {
+    "legendTitle": "Resultados de la consulta",
+    "tooltipName": "Nombre"
+  },
+  "errors": {
+    "genericQueryFailed": "Lo sentimos, esa consulta no funcionó. Intenta reformular tu pregunta.",
+    "noResults": "Ningún resultado coincidió con tu consulta.",
+    "layerUnavailable": "Esa capa de datos todavía no está cargada.",
+    "networkError": "No se pudo conectar con el servidor. Revisa tu conexión y vuelve a intentar."
+  }
+}

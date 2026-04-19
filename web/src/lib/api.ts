@@ -152,11 +152,13 @@ export interface ConversationContext {
  */
 export async function sendChatMessage(
   message: string,
-  context?: ConversationContext
+  context?: ConversationContext,
+  lang: 'en' | 'es' = 'en'
 ): Promise<ChatResponse> {
-  const request: ChatRequest & { context?: ConversationContext } = {
+  const request: ChatRequest & { context?: ConversationContext; lang?: string } = {
     message,
     context,
+    lang,
   };
 
   return apiFetch<ChatResponse>('/api/chat', {

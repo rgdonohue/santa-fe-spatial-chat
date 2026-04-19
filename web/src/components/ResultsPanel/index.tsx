@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type {
   GroundingInfo,
   QueryMetadata,
   StructuredQuery,
 } from '../../types/api';
+import fieldLabels from '../../../../shared/locales/field-labels.json';
 import './ResultsPanel.css';
 
 interface ResultsPanelProps {
@@ -88,6 +90,8 @@ export function ResultsPanel({
   onFeatureSelect,
   onClose,
 }: ResultsPanelProps) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language.startsWith('es') ? 'es' : 'en';
   const layerName = query?.selectLayer ?? 'results';
 
   const handleExportGeoJSON = useCallback(() => {
@@ -116,11 +120,13 @@ export function ResultsPanel({
   const hasMoreColumns = propertyKeys.length > 5;
 
   return (
-    <div className="results-panel" role="region" aria-label="Query results">
+    <div className="results-panel" role="region" aria-label={t('results.regionLabel')}>
       <div className="results-header">
         <div className="results-title">
-          <h3>Results</h3>
-          <span className="results-count">{features.length} features</span>
+          <h3>{t('results.heading')}</h3>
+          <span className="results-count">
+            {t('results.featureCount', { count: features.length })}
+          </span>
         </div>
         <div className="results-actions">
           {features.length > 0 && (
@@ -129,8 +135,8 @@ export function ResultsPanel({
                 type="button"
                 className="export-btn"
                 onClick={handleExportGeoJSON}
-                aria-label="Download results as GeoJSON"
-                title="Download GeoJSON"
+                aria-label={t('results.downloadGeoJsonLabel')}
+                title={t('results.downloadGeoJsonTitle')}
               >
                 GeoJSON
               </button>
@@ -138,8 +144,8 @@ export function ResultsPanel({
                 type="button"
                 className="export-btn"
                 onClick={handleExportCSV}
-                aria-label="Download results as CSV"
-                title="Download CSV"
+                aria-label={t('results.downloadCsvLabel')}
+                title={t('results.downloadCsvTitle')}
               >
                 CSV
               </button>
@@ -149,7 +155,7 @@ export function ResultsPanel({
             type="button"
             className="results-close-btn"
             onClick={onClose}
-            aria-label="Close results"
+            aria-label={t('results.close')}
           >
             &times;
           </button>
@@ -159,7 +165,7 @@ export function ResultsPanel({
       {explanation && (
         <div className="results-explanation">
           {equityNarrative && (
-            <span className="equity-label">Housing equity analysis</span>
+            <span className="equity-label">{t('results.equityLabel')}</span>
           )}
           <p>{explanation}</p>
         </div>
@@ -170,18 +176,18 @@ export function ResultsPanel({
           {grounding && (
             <div className="provenance-row">
               <span className={`grounding-badge grounding-${grounding.status}`}>
-                Grounding: {grounding.status.replace('_', ' ')}
+                {t('results.grounding')}: {grounding.status.replace('_', ' ')}
               </span>
               {grounding.missingLayers.length > 0 && (
                 <span className="provenance-text">
-                  Missing: {grounding.missingLayers.join(', ')}
+                  {t('results.missing')}: {grounding.missingLayers.join(', ')}
                 </span>
               )}
             </div>
           )}
           {metadata?.sourceLayers && metadata.sourceLayers.length > 0 && (
             <div className="provenance-row">
-              <span className="provenance-label">Sources</span>
+              <span className="provenance-label">{t('results.sources')}</span>
               <span className="provenance-text">
                 {metadata.sourceLayers.join(', ')}
               </span>
@@ -189,14 +195,14 @@ export function ResultsPanel({
           )}
           {metadata?.queryHash && (
             <div className="provenance-row">
-              <span className="provenance-label">Query hash</span>
+              <span className="provenance-label">{t('results.queryHash')}</span>
               <span className="provenance-text">{metadata.queryHash}</span>
             </div>
           )}
           {metadata?.truncated && (
             <div className="provenance-row">
               <span className="provenance-warning">
-                Results truncated at {metadata.maxFeaturesApplied ?? metadata.count} features
+                {t('results.truncatedAt', { count: metadata.maxFeaturesApplied ?? metadata.count })}
               </span>
             </div>
           )}
@@ -205,7 +211,7 @@ export function ResultsPanel({
 
       {query && (
         <details className="query-details">
-          <summary>View Query</summary>
+          <summary>{t('results.viewQuery')}</summary>
           <pre className="query-json">{JSON.stringify(query, null, 2)}</pre>
         </details>
       )}
@@ -213,13 +219,13 @@ export function ResultsPanel({
       {selectedFeature && (
         <div className="selected-feature-details">
           <div className="selected-header">
-            <h4>Selected Feature</h4>
+            <h4>{t('results.selectedFeature')}</h4>
             <button
               type="button"
               className="deselect-btn"
               onClick={() => onFeatureSelect(null)}
             >
-              Clear
+              {t('results.clearSelection')}
             </button>
           </div>
           <div className="feature-properties">
@@ -227,8 +233,8 @@ export function ResultsPanel({
               .filter(([key]) => !key.startsWith('_'))
               .map(([key, value]) => (
                 <div key={key} className="property-row">
-                  <span className="property-key">{formatKey(key)}</span>
-                  <span className="property-value">{formatValue(value)}</span>
+                  <span className="property-key">{localizeKey(layerName, key, lang)}</span>
+                  <span className="property-value">{formatValue(value, lang)}</span>
                 </div>
               ))}
           </div>
@@ -237,11 +243,11 @@ export function ResultsPanel({
 
       {features.length > 0 && (
         <div className="results-table-container">
-          <table className="results-table" aria-label="Feature results">
+          <table className="results-table" aria-label={t('results.featureResults')}>
             <thead>
               <tr>
                 {displayKeys.map((key) => (
-                  <th key={key} scope="col">{formatKey(key)}</th>
+                  <th key={key} scope="col">{localizeKey(layerName, key, lang)}</th>
                 ))}
                 {hasMoreColumns && <th scope="col">...</th>}
               </tr>
@@ -266,7 +272,7 @@ export function ResultsPanel({
                   >
                     {displayKeys.map((key) => (
                       <td key={key}>
-                        {formatValue(feature.properties?.[key])}
+                        {formatValue(feature.properties?.[key], lang)}
                       </td>
                     ))}
                     {hasMoreColumns && <td>...</td>}
@@ -277,7 +283,7 @@ export function ResultsPanel({
           </table>
           {features.length > 100 && (
             <div className="results-truncated">
-              Showing first 100 of {features.length} features
+              {t('results.truncatedAt', { count: features.length })}
             </div>
           )}
         </div>
@@ -321,36 +327,33 @@ function featuresEqual(
   return false;
 }
 
-/**
- * Format property key for display
- */
-function formatKey(key: string): string {
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+type FieldLabelMap = Record<string, Record<string, { en: string; es: string }>>;
+
+function localizeKey(layer: string, key: string, lang: 'en' | 'es'): string {
+  const layerMap = (fieldLabels as FieldLabelMap)[layer];
+  const label = layerMap?.[key];
+  if (label) return label[lang];
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-/**
- * Format property value for display
- */
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, lang: 'en' | 'es'): string {
   if (value === null || value === undefined) {
     return '—';
   }
 
   if (typeof value === 'number') {
-    // Format numbers with commas
+    const locale = lang === 'es' ? 'es-MX' : 'en-US';
     if (Number.isInteger(value)) {
-      return value.toLocaleString();
+      return value.toLocaleString(locale);
     }
-    return value.toLocaleString(undefined, {
+    return value.toLocaleString(locale, {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     });
   }
 
   if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
+    return value ? (lang === 'es' ? 'Sí' : 'Yes') : (lang === 'es' ? 'No' : 'No');
   }
 
   if (Array.isArray(value)) {

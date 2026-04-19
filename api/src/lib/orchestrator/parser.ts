@@ -78,9 +78,10 @@ export class IntentParser {
    */
   async parse(
     userQuery: string,
-    context?: ConversationContext | null
+    context?: ConversationContext | null,
+    lang: 'en' | 'es' = 'en'
   ): Promise<ParseResult> {
-    const prompt = this.buildPrompt(userQuery, context ?? null);
+    const prompt = this.buildPrompt(userQuery, context ?? null, lang);
     const rawResponse = await this.llm.complete(prompt);
 
     // Extract JSON from response
@@ -120,7 +121,8 @@ export class IntentParser {
    */
   private buildPrompt(
     userQuery: string,
-    context: ConversationContext | null
+    context: ConversationContext | null,
+    lang: 'en' | 'es' = 'en'
   ): string {
     // Filter to only available layers (if set), otherwise show all
     const layersToShow = this.availableLayers.size > 0
@@ -157,11 +159,29 @@ If the user's new query refers to the previous results (e.g. "filter those", "no
 `
       : '';
 
+    const spanishNote = lang === 'es'
+      ? `
+Language: The user is writing in Spanish (New Mexican Spanish). Parse their query directly — do NOT translate to English first. Common terms to recognize:
+- parcela/parcelas = parcels layer
+- acequia/acequias = hydrology layer, filter is_acequia=true
+- arroyo/arroyos = hydrology layer, filter is_arroyo=true
+- barrio/vecindario = neighborhoods layer
+- parcela baldía/parcelas baldías = parcels, is_vacant=true
+- sector censal/sectores censales = census_tracts layer
+- vivienda asequible = affordable_housing layer
+- zona inundable/zonas inundables = flood_zones layer
+- valor tasado = assessed_value field
+- ingresos medianos = median_income field
+- alquiler de corto plazo = short_term_rentals layer
+- parada de autobús/paradas = transit_access layer
+`
+      : '';
+
     return `You are a spatial query parser for Santa Fe, New Mexico. Convert natural language queries into structured JSON queries.
 
 Available layers:
 ${layerDescriptions}
-
+${spanishNote}
 IMPORTANT:
 - Use only layers and fields listed above.
 - Do not invent layers or fields that are not listed.
@@ -674,6 +694,83 @@ User: "Transit stops along bikeways"
       "targetLayer": "bikeways",
       "distance": 100
     }
+  ]
+}`);
+    }
+
+    // Spanish few-shot examples (New Mexican Spanish)
+    if (hasLayer('parcels')) {
+      examples.push(`User: "Parcelas con valor tasado mayor a 1 millón"
+{
+  "selectLayer": "parcels",
+  "attributeFilters": [
+    {"field": "assessed_value", "op": "gt", "value": 1000000}
+  ]
+}`);
+    }
+
+    if (hasLayer('parcels') && hasLayer('transit_access')) {
+      const zoningFilter = this.availableLayerFields.size === 0 || this.availableLayerFields.get('parcels')?.has('zoning')
+        ? `    {"field": "zoning", "op": "like", "value": "R%"},\n    `
+        : '';
+      examples.push(`User: "Muéstrame parcelas residenciales baldías dentro de 500 metros de una parada de autobús"
+{
+  "selectLayer": "parcels",
+  "attributeFilters": [
+    ${zoningFilter}{"field": "is_vacant", "op": "eq", "value": true}
+  ],
+  "spatialFilters": [
+    {"op": "within_distance", "targetLayer": "transit_access", "distance": 500}
+  ]
+}`);
+    }
+
+    if (hasLayer('census_tracts')) {
+      examples.push(`User: "Sectores censales donde el ingreso mediano está por debajo de los $40,000"
+{
+  "selectLayer": "census_tracts",
+  "attributeFilters": [
+    {"field": "median_income", "op": "lt", "value": 40000}
+  ]
+}`);
+    }
+
+    if (hasLayer('parcels') && hasLayer('hydrology')) {
+      examples.push(`User: "Parcelas dentro de 200 metros de un arroyo y en zona inundable"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {"op": "within_distance", "targetLayer": "hydrology", "distance": 200},
+    {"op": "intersects", "targetLayer": "flood_zones"}
+  ]
+}
+
+User: "Parcelas que colindan con una acequia en Agua Fría"
+{
+  "selectLayer": "parcels",
+  "spatialFilters": [
+    {"op": "within_distance", "targetLayer": "hydrology", "distance": 50, "targetFilter": [{"field": "is_acequia", "op": "eq", "value": true}]},
+    {"op": "within", "targetLayer": "neighborhoods", "targetFilter": [{"field": "name", "op": "like", "value": "%Agua Fr%"}]}
+  ]
+}`);
+    }
+
+    if (hasLayer('short_term_rentals')) {
+      examples.push(`User: "Permisos de alquiler de corto plazo cerca del centro"
+{
+  "selectLayer": "short_term_rentals",
+  "spatialFilters": [
+    {"op": "within_distance", "targetLayer": "neighborhoods", "targetFilter": [{"field": "name", "op": "like", "value": "%Downtown%"}], "distance": 500}
+  ]
+}`);
+    }
+
+    if (hasLayer('parks')) {
+      examples.push(`User: "Parques de más de 10 acres"
+{
+  "selectLayer": "parks",
+  "attributeFilters": [
+    {"field": "acres", "op": "gt", "value": 10}
   ]
 }`);
     }

@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "purpose": "Bilingual display labels for layer fields. Use to localize column headers, tooltips, and property rows. Keys are `{layer}.{field}`; unknown keys should fall back to humanized column name.",
+    "notes": "Spanish labels use New Mexican conventions where applicable (e.g., 'parcela', 'acequia', 'arroyo'). Keep labels short — they appear in table headers."
+  },
+  "parcels": {
+    "parcel_id": { "en": "Parcel ID", "es": "Id. de parcela" },
+    "owner_name": { "en": "Owner", "es": "Propietario" },
+    "address": { "en": "Address", "es": "Dirección" },
+    "zoning": { "en": "Zoning", "es": "Zonificación" },
+    "land_use": { "en": "Land use", "es": "Uso del suelo" },
+    "assessed_value": { "en": "Assessed value", "es": "Valor tasado" },
+    "year_built": { "en": "Year built", "es": "Año de construcción" },
+    "acres": { "en": "Acres", "es": "Acres" },
+    "is_vacant": { "en": "Vacant", "es": "Baldía" },
+    "neighborhood": { "en": "Neighborhood", "es": "Barrio" }
+  },
+  "census_tracts": {
+    "geoid": { "en": "GEOID", "es": "GEOID" },
+    "tract_name": { "en": "Tract", "es": "Sector censal" },
+    "median_income": { "en": "Median income", "es": "Ingreso mediano" },
+    "total_population": { "en": "Population", "es": "Población" },
+    "pct_hispanic": { "en": "% Hispanic/Latino", "es": "% Hispano/Latino" },
+    "pct_renter": { "en": "% Renters", "es": "% Inquilinos" },
+    "median_home_value": { "en": "Median home value", "es": "Valor mediano de vivienda" }
+  },
+  "zoning": {
+    "zone_code": { "en": "Zone code", "es": "Código de zona" },
+    "zone_description": { "en": "Zone description", "es": "Descripción de zona" },
+    "district": { "en": "District", "es": "Distrito" }
+  },
+  "neighborhoods": {
+    "name": { "en": "Neighborhood", "es": "Barrio" },
+    "area_acres": { "en": "Area (acres)", "es": "Superficie (acres)" }
+  },
+  "hydrology": {
+    "feature_type": { "en": "Water feature", "es": "Tipo de agua" },
+    "name": { "en": "Name", "es": "Nombre" },
+    "is_arroyo": { "en": "Arroyo", "es": "Arroyo" },
+    "is_acequia": { "en": "Acequia", "es": "Acequia" }
+  },
+  "flood_zones": {
+    "zone": { "en": "FEMA zone", "es": "Zona FEMA" },
+    "sfha": { "en": "Special flood hazard", "es": "Peligro especial de inundación" }
+  },
+  "transit": {
+    "stop_name": { "en": "Stop name", "es": "Nombre de parada" },
+    "route": { "en": "Route", "es": "Ruta" },
+    "stop_id": { "en": "Stop ID", "es": "Id. de parada" }
+  },
+  "short_term_rentals": {
+    "permit_number": { "en": "Permit number", "es": "Número de permiso" },
+    "status": { "en": "Status", "es": "Estado" },
+    "accommodates": { "en": "Sleeps", "es": "Capacidad" },
+    "price_per_night": { "en": "Price / night", "es": "Precio por noche" }
+  },
+  "affordable_housing": {
+    "project_name": { "en": "Project", "es": "Proyecto" },
+    "units": { "en": "Units", "es": "Unidades" },
+    "program": { "en": "Program", "es": "Programa" }
+  },
+  "parks": {
+    "name": { "en": "Park", "es": "Parque" },
+    "acres": { "en": "Acres", "es": "Acres" },
+    "type": { "en": "Type", "es": "Tipo" }
+  },
+  "bikeways": {
+    "route_name": { "en": "Route", "es": "Ruta" },
+    "facility_type": { "en": "Facility", "es": "Tipo de ciclovía" },
+    "trail_miles": { "en": "Miles", "es": "Millas" }
+  },
+  "historic_districts": {
+    "district_name": { "en": "Historic district", "es": "Distrito histórico" }
+  },
+  "city_limits": {
+    "name": { "en": "Name", "es": "Nombre" }
+  },
+  "building_footprints": {
+    "height_m": { "en": "Height (m)", "es": "Altura (m)" },
+    "footprint_area": { "en": "Footprint area", "es": "Superficie de huella" }
+  }
+}

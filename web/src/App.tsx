@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChatPanel } from './components/ChatPanel';
 import { MapView } from './components/MapView';
 import { ResultsPanel } from './components/ResultsPanel';
@@ -7,6 +8,17 @@ import { getChoroplethConfig } from './lib/choropleth';
 import './App.css';
 
 function App() {
+  const { i18n, t } = useTranslation();
+
+  useEffect(() => {
+    document.documentElement.lang = i18n.language.startsWith('es') ? 'es' : 'en';
+  }, [i18n.language]);
+
+  function toggleLanguage() {
+    const next = i18n.language.startsWith('es') ? 'en' : 'es';
+    void i18n.changeLanguage(next);
+  }
+
   const {
     messages,
     isLoading,
@@ -31,6 +43,14 @@ function App() {
 
   return (
     <div className="app-layout">
+      <button
+        type="button"
+        className="lang-toggle"
+        onClick={toggleLanguage}
+        aria-label={i18n.language.startsWith('es') ? t('language.switchToEnglish') : t('language.switchToSpanish')}
+      >
+        {i18n.language.startsWith('es') ? 'EN' : 'ES'}
+      </button>
       <aside className="app-sidebar">
         <ChatPanel
           messages={messages}

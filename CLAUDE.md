@@ -69,6 +69,15 @@ Supports: attribute filters (`eq`, `in`, `like`, `gt`, etc.), spatial filters (`
 ### VARCHAR Numeric Fields
 Some DuckDB columns are VARCHAR but represent numbers (e.g., `year_built`, `price_per_night`, `accommodates`, `trail_miles`). The query builder auto-wraps these in `TRY_CAST(... AS DOUBLE)` for numeric comparisons. The field map is `VARCHAR_NUMERIC_FIELDS` in `builder.ts`.
 
+## Bilingual Requirements
+
+- All user-facing strings ship in both English and Spanish. No English-only UI features.
+- LLM prompts must accept Spanish input (including New Mexican Spanish) without translating to English first — parse directly to StructuredQuery.
+- Explanations are generated in the same language as the user's query. Thread `lang: 'en' | 'es'` from the request through to `IntentParser` and `generateExplanation`.
+- UI strings live in `web/src/locales/{en,es}/common.json`. Field display labels live in `shared/locales/field-labels.json`.
+- Translation tone: New Mexican Spanish. Use *acequia*, *arroyo*, *barrio*, *parcela*, *sector censal*, *baldía*, *valor tasado*. Avoid generic Latin American alternatives.
+- Roadmap items (new layers, features) must include Spanish translations in the same PR.
+
 ## Coding Conventions
 
 - TypeScript with `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`

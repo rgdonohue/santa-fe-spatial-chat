@@ -12,34 +12,41 @@
 import type { StructuredQuery } from '../../../../shared/types/query';
 import type { LLMClient } from '../llm/types';
 
-/** Friendly display names for known layers */
-const LAYER_DISPLAY_NAMES: Record<string, string> = {
-  parcels: 'parcels',
-  building_footprints: 'buildings',
-  short_term_rentals: 'short-term rentals',
-  transit_access: 'transit stops',
-  zoning_districts: 'zoning districts',
-  census_tracts: 'census tracts',
-  hydrology: 'water features',
-  flood_zones: 'flood zones',
-  neighborhoods: 'neighborhoods',
-  parks: 'parks',
-  bikeways: 'bikeways',
-  historic_districts: 'historic districts',
-  city_limits: 'city limits',
+const LAYER_DISPLAY_NAMES: Record<string, { en: string; es: string }> = {
+  parcels:            { en: 'parcels',           es: 'parcelas' },
+  building_footprints:{ en: 'buildings',         es: 'edificios' },
+  short_term_rentals: { en: 'short-term rentals', es: 'alquileres de corto plazo' },
+  transit_access:     { en: 'transit stops',      es: 'paradas de tránsito' },
+  zoning_districts:   { en: 'zoning districts',   es: 'distritos de zonificación' },
+  census_tracts:      { en: 'census tracts',      es: 'sectores censales' },
+  hydrology:          { en: 'water features',     es: 'elementos hidrológicos' },
+  flood_zones:        { en: 'flood zones',         es: 'zonas inundables' },
+  neighborhoods:      { en: 'neighborhoods',       es: 'barrios' },
+  parks:              { en: 'parks',              es: 'parques' },
+  bikeways:           { en: 'bikeways',           es: 'ciclovías' },
+  historic_districts: { en: 'historic districts', es: 'distritos históricos' },
+  city_limits:        { en: 'city limits',         es: 'límites de la ciudad' },
+  affordable_housing: { en: 'affordable housing', es: 'vivienda asequible' },
 };
 
-/** Friendly display names for comparison operators */
-const OP_DISPLAY_NAMES: Record<string, string> = {
-  eq: 'equal to',
-  neq: 'not equal to',
-  gt: 'greater than',
-  gte: 'at least',
-  lt: 'less than',
-  lte: 'at most',
-  like: 'matching',
-  in: 'in',
+const OP_DISPLAY_NAMES: Record<string, { en: string; es: string }> = {
+  eq:  { en: 'equal to',     es: 'igual a' },
+  neq: { en: 'not equal to', es: 'distinto de' },
+  gt:  { en: 'greater than', es: 'mayor que' },
+  gte: { en: 'at least',     es: 'al menos' },
+  lt:  { en: 'less than',    es: 'menor que' },
+  lte: { en: 'at most',      es: 'como máximo' },
+  like:{ en: 'matching',     es: 'que coincide con' },
+  in:  { en: 'in',           es: 'en' },
 };
+
+function layerName(layer: string, lang: 'en' | 'es'): string {
+  return LAYER_DISPLAY_NAMES[layer]?.[lang] ?? layer;
+}
+
+function opName(op: string, lang: 'en' | 'es'): string {
+  return OP_DISPLAY_NAMES[op]?.[lang] ?? op;
+}
 
 // ── Equity context hints keyed by layer ────────────────────────────
 const EQUITY_CONTEXT: Record<string, string> = {
@@ -69,47 +76,70 @@ const EQUITY_CONTEXT: Record<string, string> = {
  * Generate a deterministic human-readable explanation from a
  * StructuredQuery and the number of features returned.
  */
-export function generateExplanation(query: StructuredQuery, count: number): string {
+export function generateExplanation(
+  query: StructuredQuery,
+  count: number,
+  lang: 'en' | 'es' = 'en'
+): string {
   const attributeParts: string[] = [];
   const spatialParts: string[] = [];
-  const layerName = LAYER_DISPLAY_NAMES[query.selectLayer] || query.selectLayer;
+  const layer = layerName(query.selectLayer, lang);
 
   if (query.attributeFilters && query.attributeFilters.length > 0) {
     for (const filter of query.attributeFilters) {
       attributeParts.push(
-        `${filter.field.replace(/_/g, ' ')} ${OP_DISPLAY_NAMES[filter.op] || filter.op} ${filter.value}`
+        `${filter.field.replace(/_/g, ' ')} ${opName(filter.op, lang)} ${filter.value}`
       );
     }
   }
 
   if (query.spatialFilters && query.spatialFilters.length > 0) {
     for (const filter of query.spatialFilters) {
-      const targetName = LAYER_DISPLAY_NAMES[filter.targetLayer] || filter.targetLayer;
+      const target = layerName(filter.targetLayer, lang);
       if (filter.op === 'within_distance') {
-        spatialParts.push(`within ${filter.distance}m of ${targetName}`);
+        spatialParts.push(
+          lang === 'es'
+            ? `dentro de ${filter.distance}m de ${target}`
+            : `within ${filter.distance}m of ${target}`
+        );
       } else if (filter.op === 'nearest') {
-        spatialParts.push(`nearest ${filter.limit} to ${targetName}`);
+        spatialParts.push(
+          lang === 'es'
+            ? `los ${filter.limit} más cercanos a ${target}`
+            : `nearest ${filter.limit} to ${target}`
+        );
       } else {
-        spatialParts.push(`${filter.op} ${targetName}`);
+        spatialParts.push(
+          lang === 'es'
+            ? `que ${filter.op} ${target}`
+            : `${filter.op} ${target}`
+        );
       }
     }
   }
 
+  const logicWord = (logic: string) =>
+    lang === 'es' ? (logic === 'or' ? 'O' : 'Y') : logic.toUpperCase();
+
   const segments: string[] = [];
   if (attributeParts.length > 0) {
-    const attributeLogic = (query.attributeLogic ?? 'and').toUpperCase();
-    segments.push(attributeParts.join(` ${attributeLogic} `));
+    const w = logicWord(query.attributeLogic ?? 'and');
+    segments.push(attributeParts.join(` ${w} `));
   }
   if (spatialParts.length > 0) {
-    const spatialLogic = (query.spatialLogic ?? 'and').toUpperCase();
-    segments.push(spatialParts.join(` ${spatialLogic} `));
+    const w = logicWord(query.spatialLogic ?? 'and');
+    segments.push(spatialParts.join(` ${w} `));
   }
 
   if (segments.length === 0) {
-    return `Found ${count} ${layerName}.`;
+    return lang === 'es'
+      ? `Se encontraron ${count} ${layer}.`
+      : `Found ${count} ${layer}.`;
   }
 
-  return `Found ${count} ${layerName} where ${segments.join(' AND ')}.`;
+  return lang === 'es'
+    ? `Se encontraron ${count} ${layer} donde ${segments.join(' Y ')}.`
+    : `Found ${count} ${layer} where ${segments.join(' AND ')}.`;
 }
 
 /**
@@ -156,7 +186,8 @@ export function buildEquityPrompt(
   query: StructuredQuery,
   deterministicExplanation: string,
   count: number,
-  features: Array<{ properties: Record<string, unknown> | null }> = []
+  features: Array<{ properties: Record<string, unknown> | null }> = [],
+  lang: 'en' | 'es' = 'en'
 ): string {
   const equityHint = EQUITY_CONTEXT[query.selectLayer] ?? '';
   const spatialLayers = (query.spatialFilters ?? []).map((f) => f.targetLayer);
@@ -166,6 +197,11 @@ export function buildEquityPrompt(
     .join(' ');
 
   const stats = computeResultStats(features);
+  const layer = layerName(query.selectLayer, lang);
+
+  const langInstruction = lang === 'es'
+    ? 'Responde en español. Usa vocabulario del español nuevomexicano: parcela, acequia, barrio, sector censal, baldía, valor tasado, arroyo — no español genérico. Mantén el mismo tono natural y cercano a la comunidad.'
+    : 'Respond in English.';
 
   return `You are a housing equity analyst for Santa Fe, New Mexico.
 A user queried spatial data and got the following result:
@@ -173,7 +209,7 @@ A user queried spatial data and got the following result:
 ${deterministicExplanation}
 
 Query details:
-- Primary layer: ${query.selectLayer} (${LAYER_DISPLAY_NAMES[query.selectLayer] || query.selectLayer})
+- Primary layer: ${query.selectLayer} (${layer})
 - Feature count: ${count}
 ${query.attributeFilters?.length ? `- Attribute filters: ${JSON.stringify(query.attributeFilters)}` : ''}
 ${query.spatialFilters?.length ? `- Spatial filters: ${JSON.stringify(query.spatialFilters)}` : ''}
@@ -181,6 +217,8 @@ ${stats ? `\nResult statistics (value ranges across matched features):\n${stats}
 
 ${equityHint ? `Context: ${equityHint}` : ''}
 ${additionalContext ? `Additional context: ${additionalContext}` : ''}
+
+${langInstruction}
 
 Write 2-3 sentences that:
 1. Summarize the result in plain language
@@ -201,12 +239,13 @@ export async function generateEquityExplanation(
   query: StructuredQuery,
   count: number,
   features: Array<{ properties: Record<string, unknown> | null }> = [],
-  options?: { timeoutMs?: number }
+  options?: { timeoutMs?: number; lang?: 'en' | 'es' }
 ): Promise<{ explanation: string; equityNarrative: string | null }> {
-  const deterministicExplanation = generateExplanation(query, count);
+  const lang = options?.lang ?? 'en';
+  const deterministicExplanation = generateExplanation(query, count, lang);
 
   try {
-    const prompt = buildEquityPrompt(query, deterministicExplanation, count, features);
+    const prompt = buildEquityPrompt(query, deterministicExplanation, count, features, lang);
     const timeoutMs = options?.timeoutMs ?? 5000;
 
     const narrative = await Promise.race([

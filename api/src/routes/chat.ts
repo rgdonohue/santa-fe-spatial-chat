@@ -30,6 +30,7 @@ import { log } from '../lib/logger';
 // ── Request validation schema ─────────────────────────────────────────────────
 const chatBodySchema = z.object({
   message: z.string().min(1, 'message must be a non-empty string'),
+  lang: z.enum(['en', 'es']).optional(),
   context: z
     .object({
       previousQuery: z.record(z.string(), z.unknown()),
@@ -146,6 +147,11 @@ chatRoute.post('/', async (c) => {
     }
     const body = bodyValidation.data;
 
+    // Resolve language: explicit body field → Accept-Language header → 'en'
+    const acceptLang = c.req.header('Accept-Language') ?? '';
+    const lang: 'en' | 'es' = body.lang
+      ?? (acceptLang.toLowerCase().startsWith('es') ? 'es' : 'en');
+
     const conversationContext: ConversationContext | null = body.context
       ? (body.context as unknown as ConversationContext)
       : null;
@@ -178,7 +184,7 @@ chatRoute.post('/', async (c) => {
     } else {
       try {
         const parseStart = performance.now();
-        parseResult = await parser.parse(body.message, conversationContext);
+        parseResult = await parser.parse(body.message, conversationContext, lang);
         parseTimeMs = performance.now() - parseStart;
         parseCache.set(body.message, parseResult);
       } catch (error) {
@@ -254,7 +260,8 @@ chatRoute.post('/', async (c) => {
 
     const deterministicExplanation = generateExplanation(
       prepared.executableQuery,
-      result.features.length
+      result.features.length,
+      lang
     );
 
     // Attempt LLM equity explanation (5s timeout); fall back to deterministic on failure
@@ -265,7 +272,7 @@ chatRoute.post('/', async (c) => {
         prepared.executableQuery,
         result.features.length,
         result.features as Array<{ properties: Record<string, unknown> | null }>,
-        { timeoutMs: 5000 }
+        { timeoutMs: 5000, lang }
       );
       equityNarrative = equity.equityNarrative;
     } catch {

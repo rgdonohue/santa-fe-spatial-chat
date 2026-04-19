@@ -1,5 +1,7 @@
 # Parcela
 
+*Read this in [Español](README.es.md).*
+
 **Explore Santa Fe housing, land use, and equity — in plain English.**
 
 Parcela is a natural language interface for exploring spatial data about Santa Fe, New Mexico. Type a question like *"Show me vacant residential parcels within 500 meters of a bus stop"* and see the results on an interactive map with a plain-English explanation.
@@ -27,12 +29,27 @@ This tool aims to make that analysis accessible to anyone: residents, journalist
 
 ## Features
 
-- **Natural language queries** — Ask questions in plain English; an LLM translates them to spatial queries
+- **Natural language queries** — Ask questions in plain English or Spanish; an LLM translates them to spatial queries
 - **Interactive map** — Results displayed on a MapLibre GL map centered on Santa Fe
 - **Transparent queries** — See exactly what spatial operation was executed, not just the results
 - **Equity-aware explanations** — AI-generated summaries that consider demographic and equity context
 - **Multiple data layers** — Parcels, census tracts, zoning, hydrology, transit, and more
 - **Export results** — Download findings as GeoJSON or CSV for further analysis
+- **Bilingual — English & Spanish** — Interface and query understanding in both languages, with New Mexican vocabulary honored
+
+---
+
+## Accessibility & Language
+
+Parcela is bilingual — English and Spanish — as a first-order commitment, not an afterthought. Santa Fe has deep Spanish-speaking roots, and the questions this tool asks — about housing, *acequias*, *barrios*, and equity — should be askable in the language communities already use to think about them.
+
+- The interface detects your browser language and offers a toggle to switch at any time
+- Queries in Spanish are understood directly — they are not translated to English first
+- Explanations are generated in the same language you asked in
+- We use New Mexican Spanish vocabulary where it applies: *acequia*, *arroyo*, *barrio*, *parcela*, *sector censal*
+- Translations are reviewed by native Spanish speakers from Santa Fe before publishing
+
+If a translation doesn't sound right for Santa Fe, please open an issue.
 
 ---
 

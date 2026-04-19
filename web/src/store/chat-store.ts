@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import type { Feature, Geometry } from 'geojson';
+import i18n from '../i18n';
 import { sendChatMessage, ApiClientError } from '../lib/api';
 import type {
   ChatMessage,
@@ -112,9 +113,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { conversationContext } = get();
 
     try {
+      const lang: 'en' | 'es' = i18n.language.startsWith('es') ? 'es' : 'en';
       const response: ChatResponse = await sendChatMessage(
         content,
-        conversationContext ?? undefined
+        conversationContext ?? undefined,
+        lang
       );
 
       const assistantMessage: ChatMessage = {

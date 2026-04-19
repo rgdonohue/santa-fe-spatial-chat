@@ -18,6 +18,8 @@ A tool for investigating housing affordability, land use patterns, and equity in
 
 6. **Explicit CRS discipline** — Store geometries in WGS84 (EPSG:4326) for interchange, but run distance/buffer/nearest operations in a projected CRS (UTM 13N, EPSG:32613) to keep meters correct.
 
+7. **Bilingual by design** — English and Spanish are first-class. The LLM parses Spanish input directly to StructuredQuery (no translate-then-parse). Explanations are generated in the user's language. UI strings are externalized in `web/src/locales/`. See the [Bilingual Design](#bilingual-design) section.
+
 ---
 
 ## Project Goals
@@ -743,3 +745,56 @@ interface ExportOptions {
 - **Comparison queries** — "Compare income in tracts near vs. far from transit"
 
 These are noted for architecture awareness but not planned for initial build.
+
+---
+
+## Bilingual Design
+
+Santa Fe has a majority-Hispanic population and a deep Spanish-speaking heritage. Parcela commits to English/Spanish parity as a design principle, not an add-on.
+
+### Language detection and routing
+
+The frontend detects language from `navigator.language` (via `i18next-browser-languagedetector`), persists the preference in `localStorage`, and exposes a toggle in the UI. The selected language (`en` | `es`) is sent with every `/api/chat` request as a `lang` field.
+
+### LLM — parse Spanish directly
+
+The `IntentParser` system prompt explicitly instructs the model to accept Spanish (including New Mexican Spanish) and emit the same `StructuredQuery` JSON without translating to English first. Key domain terms are mapped in the prompt:
+
+| Spanish | Meaning for the parser |
+|---|---|
+| *acequia* | hydrology layer, `is_acequia=true` |
+| *arroyo* | hydrology layer, `is_arroyo=true` |
+| *barrio* / *vecindario* | neighborhoods layer |
+| *parcela baldía* | parcels, `is_vacant=true` |
+| *sector censal* | census_tracts layer |
+| *vivienda asequible* | affordable_housing layer |
+| *zona inundable* | flood_zones layer |
+| *valor tasado* | `assessed_value` field |
+| *alquiler de corto plazo* | short_term_rentals layer |
+
+Few-shot examples in Spanish are included alongside the English examples in the parser prompt (see `docs/I18N_DRAFT.md` for the full set).
+
+### LLM — explanations in the user's language
+
+`generateExplanation()` accepts a `lang` parameter and instructs the model to respond in that language. Spanish explanations use New Mexican vocabulary — *parcela*, *acequia*, *barrio*, *sector censal* — not generic Latin American Spanish.
+
+### UI string externalization
+
+All user-facing strings live in `web/src/locales/{en,es}/common.json`, loaded via `react-i18next`. Components use the `useTranslation` hook; no hardcoded English strings in JSX.
+
+### Field label localization
+
+`shared/locales/field-labels.json` maps `{layer}.{field}` keys to `{en, es}` display labels. `ResultsPanel` uses this for table headers and property rows, with a humanized-camelCase fallback for unmapped keys.
+
+### New Mexican Spanish vocabulary
+
+Translations use regional vocabulary rather than generic Latin American Spanish:
+
+- *acequia* (not *zanja de riego*)
+- *arroyo* (not *cauce seco*)
+- *barrio* (not *vecindario* — warmer, locally used)
+- *baldía/baldío* (not *vacante* — traditional NM usage for vacant land)
+- *sector censal* (US Census's official Spanish; not *tracto censal*)
+- Place names kept as-is: *Agua Fría*, *Acequia Madre*, *la Cañada*, *El Camino Real*
+
+All translations are reviewed by native Spanish speakers from Santa Fe before merging.

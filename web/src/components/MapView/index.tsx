@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import maplibregl from 'maplibre-gl';
 import type { Feature, Geometry } from 'geojson';
 import type { ChoroplethConfig } from '../../lib/choropleth';
@@ -60,6 +61,10 @@ export function MapView({
   choroplethConfig,
   queryLayerName,
 }: MapViewProps) {
+  const { t, i18n } = useTranslation();
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
@@ -248,7 +253,7 @@ export function MapView({
         html += `<div class="tooltip-row"><strong>ID:</strong> ${id}</div>`;
       }
       if (name) {
-        html += `<div class="tooltip-row"><strong>Name:</strong> ${name}</div>`;
+        html += `<div class="tooltip-row"><strong>${tRef.current('map.tooltipName')}:</strong> ${name}</div>`;
       }
       if (description && description !== name) {
         html += `<div class="tooltip-row tooltip-desc">${description}</div>`;
@@ -407,7 +412,7 @@ export function MapView({
       )}
       {!choroplethConfig && features.length > 0 && (
         <div className="map-legend">
-          <div className="legend-title">Query Results</div>
+          <div className="legend-title">{t('map.legendTitle')}</div>
           <div className="legend-scale">
             <div className="legend-item">
               <span className="legend-color" style={{ backgroundColor: FILL_COLOR }} />
@@ -416,7 +421,9 @@ export function MapView({
               </span>
             </div>
             <div className="legend-item">
-              <span className="legend-label">{features.length.toLocaleString()} features</span>
+              <span className="legend-label">
+                {t('results.featureCount', { count: features.length })}
+              </span>
             </div>
           </div>
         </div>
