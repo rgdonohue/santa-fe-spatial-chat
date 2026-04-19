@@ -20,6 +20,7 @@ import { join } from 'path';
 import { buildLayerRegistry } from './lib/layers/registry';
 import { RateLimiter, createRateLimitMiddleware } from './lib/middleware/rate-limiter';
 import { log } from './lib/logger';
+import { createLLMClient } from './lib/llm';
 import type { Database } from 'duckdb';
 
 const app = new Hono();
@@ -216,6 +217,29 @@ async function startServer() {
         console.log(`Server is listening on http://localhost:${p}`);
       }
     ) as Server;
+
+    // Pre-warm the LLM so the first real query doesn't pay the cold-load cost.
+    // Fire-and-forget; failures are logged but don't block startup.
+    void (async () => {
+      const warmupStart = performance.now();
+      try {
+        const llm = createLLMClient();
+        await llm.complete('Reply with the single word "ready".', { maxTokens: 8 });
+        log({
+          level: 'info',
+          event: 'llm.warmup',
+          status: 'ok',
+          durationMs: Math.round(performance.now() - warmupStart),
+        });
+      } catch (err) {
+        log({
+          level: 'warn',
+          event: 'llm.warmup',
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      }
+    })();
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

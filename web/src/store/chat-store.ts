@@ -123,7 +123,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response.explanation,
+        content: response.summary ?? response.explanation,
         timestamp: new Date(),
         query: response.query,
         result: response.result,

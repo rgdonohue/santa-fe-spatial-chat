@@ -67,6 +67,9 @@ export interface ChatRequest {
 export interface ChatResponse {
   query: StructuredQuery;
   result: QueryResult;
+  /** Short deterministic one-liner ("Found N ..."). Use for chat log. */
+  summary: string;
+  /** Full narrative — equity LLM output when available, else deterministic. Use for Results panel. */
   explanation: string;
   equityNarrative?: string | null;
   confidence: number;

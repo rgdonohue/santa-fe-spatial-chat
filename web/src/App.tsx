@@ -8,16 +8,11 @@ import { getChoroplethConfig } from './lib/choropleth';
 import './App.css';
 
 function App() {
-  const { i18n, t } = useTranslation();
+  const { i18n } = useTranslation();
 
   useEffect(() => {
     document.documentElement.lang = i18n.language.startsWith('es') ? 'es' : 'en';
   }, [i18n.language]);
-
-  function toggleLanguage() {
-    const next = i18n.language.startsWith('es') ? 'en' : 'es';
-    void i18n.changeLanguage(next);
-  }
 
   const {
     messages,
@@ -34,6 +29,7 @@ function App() {
     selectFeature,
     clickFeature,
     closeResults,
+    clearConversation,
   } = useChatStore();
 
   const choroplethConfig = useMemo(
@@ -43,18 +39,11 @@ function App() {
 
   return (
     <div className="app-layout">
-      <button
-        type="button"
-        className="lang-toggle"
-        onClick={toggleLanguage}
-        aria-label={i18n.language.startsWith('es') ? t('language.switchToEnglish') : t('language.switchToSpanish')}
-      >
-        {i18n.language.startsWith('es') ? 'EN' : 'ES'}
-      </button>
       <aside className="app-sidebar">
         <ChatPanel
           messages={messages}
           onSendMessage={sendMessage}
+          onClear={clearConversation}
           isLoading={isLoading}
         />
       </aside>

@@ -18,9 +18,12 @@
     "inputPlaceholder": "Ask a question about Santa Fe…",
     "loadingResponse": "Loading response",
     "processingQuery": "Processing your query…",
+    "processingQuerySeconds": "Processing your query… ({{seconds}}s)",
     "processingQueryHint": "Please wait, processing your query",
     "send": "Send message",
     "sending": "Processing query",
+    "newQuery": "New query",
+    "newQueryLabel": "Start a new query and clear results",
     "equityLabel": "Housing equity analysis",
     "featuresFound": "{{count}} features found in {{ms}} ms"
   },
@@ -65,6 +68,22 @@
   "map": {
     "legendTitle": "Query results",
     "tooltipName": "Name"
+  },
+  "layers": {
+    "parcels": "Parcels",
+    "building_footprints": "Buildings",
+    "short_term_rentals": "Short-term rentals",
+    "transit_access": "Transit stops",
+    "zoning_districts": "Zoning districts",
+    "census_tracts": "Census tracts",
+    "hydrology": "Water features",
+    "flood_zones": "Flood zones",
+    "neighborhoods": "Neighborhoods",
+    "parks": "Parks",
+    "bikeways": "Bikeways",
+    "historic_districts": "Historic districts",
+    "city_limits": "City limits",
+    "affordable_housing_units": "Affordable housing"
   },
   "errors": {
     "genericQueryFailed": "Sorry, that query didn't work. Try rephrasing your question.",

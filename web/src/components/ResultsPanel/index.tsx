@@ -162,6 +162,8 @@ export function ResultsPanel({
         </div>
       </div>
 
+      <div className="results-body">
+
       {explanation && (
         <div className="results-explanation">
           {equityNarrative && (
@@ -288,6 +290,7 @@ export function ResultsPanel({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

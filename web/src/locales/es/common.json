@@ -18,9 +18,12 @@
     "inputPlaceholder": "Haz una pregunta sobre Santa Fe…",
     "loadingResponse": "Cargando respuesta",
     "processingQuery": "Procesando tu consulta…",
+    "processingQuerySeconds": "Procesando tu consulta… ({{seconds}} s)",
     "processingQueryHint": "Por favor espera, estamos procesando tu consulta",
     "send": "Enviar mensaje",
     "sending": "Procesando consulta",
+    "newQuery": "Nueva consulta",
+    "newQueryLabel": "Empezar una consulta nueva y limpiar resultados",
     "equityLabel": "Análisis de equidad en vivienda",
     "featuresFound": "{{count}} resultados encontrados en {{ms}} ms"
   },
@@ -66,6 +69,22 @@
   "map": {
     "legendTitle": "Resultados de la consulta",
     "tooltipName": "Nombre"
+  },
+  "layers": {
+    "parcels": "Parcelas",
+    "building_footprints": "Edificios",
+    "short_term_rentals": "Alquileres de corto plazo",
+    "transit_access": "Paradas de tránsito",
+    "zoning_districts": "Distritos de zonificación",
+    "census_tracts": "Sectores censales",
+    "hydrology": "Elementos hidrológicos",
+    "flood_zones": "Zonas inundables",
+    "neighborhoods": "Barrios",
+    "parks": "Parques",
+    "bikeways": "Ciclovías",
+    "historic_districts": "Distritos históricos",
+    "city_limits": "Límites de la ciudad",
+    "affordable_housing_units": "Vivienda asequible"
   },
   "errors": {
     "genericQueryFailed": "Lo sentimos, esa consulta no funcionó. Intenta reformular tu pregunta.",

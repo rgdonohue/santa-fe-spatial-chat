@@ -272,7 +272,7 @@ chatRoute.post('/', async (c) => {
         prepared.executableQuery,
         result.features.length,
         result.features as Array<{ properties: Record<string, unknown> | null }>,
-        { timeoutMs: 5000, lang }
+        { timeoutMs: 12_000, lang }
       );
       equityNarrative = equity.equityNarrative;
     } catch {
@@ -290,6 +290,7 @@ chatRoute.post('/', async (c) => {
     return c.json({
       query: prepared.executableQuery,
       result,
+      summary: deterministicExplanation,
       explanation,
       equityNarrative,
       confidence: parseResult.confidence,

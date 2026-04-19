@@ -6,16 +6,23 @@ import './ChatPanel.css';
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
+  onClear: () => void;
   isLoading: boolean;
 }
 
 export function ChatPanel({
   messages,
   onSendMessage,
+  onClear,
   isLoading,
 }: ChatPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLang: 'en' | 'es' = i18n.language.startsWith('es') ? 'es' : 'en';
+  const setLang = (lang: 'en' | 'es') => {
+    if (lang !== currentLang) void i18n.changeLanguage(lang);
+  };
   const [inputValue, setInputValue] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -26,6 +33,18 @@ export function ChatPanel({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const start = performance.now();
+    const id = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((performance.now() - start) / 1000));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +67,38 @@ export function ChatPanel({
   return (
     <div className="chat-panel" role="region" aria-label={t('chat.regionLabel')}>
       <div className="chat-header">
-        <h2>{t('app.title')}</h2>
+        <div className="chat-header-top">
+          <h2>{t('app.title')}</h2>
+          <div className="chat-header-actions">
+            <div className="lang-toggle" role="group" aria-label={t('language.label')}>
+              <button
+                type="button"
+                className="lang-option"
+                aria-pressed={currentLang === 'en'}
+                onClick={() => setLang('en')}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                className="lang-option"
+                aria-pressed={currentLang === 'es'}
+                onClick={() => setLang('es')}
+              >
+                ES
+              </button>
+            </div>
+            <button
+              type="button"
+              className="new-query-btn"
+              onClick={onClear}
+              disabled={messages.length === 0 || isLoading}
+              aria-label={t('chat.newQueryLabel')}
+            >
+              {t('chat.newQuery')}
+            </button>
+          </div>
+        </div>
         <p className="chat-subtitle">
           {t('app.subtitle')}
         </p>
@@ -90,10 +140,11 @@ export function ChatPanel({
             role={message.role === 'assistant' ? 'status' : undefined}
           >
             <div className="message-content">
-              {message.role === 'assistant' && message.equityNarrative && (
-                <span className="chat-equity-label">{t('chat.equityLabel')}</span>
+              {message.role === 'assistant' ? (
+                <p className="chat-summary">{message.content}</p>
+              ) : (
+                message.content
               )}
-              {message.content}
               {message.error && (
                 <div className="message-error" role="alert">{message.error}</div>
               )}
@@ -117,7 +168,16 @@ export function ChatPanel({
                 <span>.</span>
                 <span>.</span>
               </span>
-              <span className="sr-only">{t('chat.processingQuery')}</span>
+              <span className="loading-elapsed" aria-hidden="true">
+                {elapsedSeconds > 0
+                  ? t('chat.processingQuerySeconds', { seconds: elapsedSeconds })
+                  : t('chat.processingQuery')}
+              </span>
+              <span className="sr-only">
+                {elapsedSeconds > 0
+                  ? t('chat.processingQuerySeconds', { seconds: elapsedSeconds })
+                  : t('chat.processingQuery')}
+              </span>
             </div>
           </div>
         )}

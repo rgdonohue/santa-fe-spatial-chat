@@ -1,8 +1,8 @@
 /**
  * Ollama LLM Client
- * 
+ *
  * Implementation of LLMClient for local Ollama instances.
- * Default: http://localhost:11434 with qwen2.5:7b model
+ * Default: http://localhost:11434 with llama3.2:3b model
  */
 
 import type { LLMClient, CompletionOptions } from './types';
@@ -21,7 +21,7 @@ export class OllamaClient implements LLMClient {
 
   constructor(
     private baseUrl: string = process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-    private model: string = process.env.OLLAMA_MODEL || 'qwen2.5:7b'
+    private model: string = process.env.OLLAMA_MODEL || 'llama3.2:3b'
   ) {
     this.timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
   }

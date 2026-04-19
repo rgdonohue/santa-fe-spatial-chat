@@ -39,6 +39,44 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+function humanize(name: string): string {
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/**
+ * Pick the most meaningful display string from a feature's properties.
+ * Tries a prioritized list of common label fields across all layers,
+ * then falls back to the first non-private string value.
+ */
+function pickTooltipName(props: Record<string, unknown>): string {
+  const labelFields = [
+    'name', 'property_name', 'project_name', 'park_name', 'stop_name',
+    'tract_name', 'district_name', 'zone_name', 'route_name',
+    'business_name', 'permit_number', 'address', 'parcel_id',
+    'unit_id', 'zone_code', 'geoid',
+  ];
+  for (const field of labelFields) {
+    const v = props[field];
+    if (typeof v === 'string' && v.trim()) return v;
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+  }
+  // Last resort: first usable string property
+  for (const [key, value] of Object.entries(props)) {
+    if (key.startsWith('_') || key === 'geometry') continue;
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+}
+
+function pickTooltipDescription(props: Record<string, unknown>, usedAsName: string): string {
+  const descFields = ['zone_name', 'type', 'property_type', 'address', 'facility_type', 'name_full'];
+  for (const field of descFields) {
+    const v = props[field];
+    if (typeof v === 'string' && v.trim() && v !== usedAsName) return v;
+  }
+  return '';
+}
+
 /**
  * Convert a MapLibre feature to a plain GeoJSON feature
  * MapLibre features have non-serializable geometry objects
@@ -242,21 +280,19 @@ export function MapView({
       const props = feature.properties;
       if (!props) return;
 
-      // Build tooltip content with HTML escaping
-      // Handle different feature types (zoning, hydrology, census, etc.)
-      const name = escapeHtml(String(props['name'] ?? props['zone_code'] ?? props['geoid'] ?? ''));
-      const description = escapeHtml(String(props['zone_name'] ?? props['type'] ?? props['name_full'] ?? ''));
-      const id = escapeHtml(String(props['id'] ?? ''));
+      const rawName = pickTooltipName(props);
+      const rawDesc = pickTooltipDescription(props, rawName);
 
       let html = '<div class="tooltip-content">';
-      if (id) {
-        html += `<div class="tooltip-row"><strong>ID:</strong> ${id}</div>`;
+      if (rawName) {
+        html += `<div class="tooltip-row"><strong>${tRef.current('map.tooltipName')}:</strong> ${escapeHtml(rawName)}</div>`;
       }
-      if (name) {
-        html += `<div class="tooltip-row"><strong>${tRef.current('map.tooltipName')}:</strong> ${name}</div>`;
+      if (rawDesc) {
+        html += `<div class="tooltip-row tooltip-desc">${escapeHtml(rawDesc)}</div>`;
       }
-      if (description && description !== name) {
-        html += `<div class="tooltip-row tooltip-desc">${description}</div>`;
+      // If we still have nothing, show the humanized layer name as a last resort
+      if (!rawName && !rawDesc) {
+        html += `<div class="tooltip-row tooltip-desc">${escapeHtml(humanize(queryLayerName ?? 'feature'))}</div>`;
       }
       html += '</div>';
 
@@ -417,7 +453,10 @@ export function MapView({
             <div className="legend-item">
               <span className="legend-color" style={{ backgroundColor: FILL_COLOR }} />
               <span className="legend-label">
-                {queryLayerName || 'Selected layer'} ({getDominantGeometry(features)})
+                {queryLayerName
+                  ? t(`layers.${queryLayerName}`, { defaultValue: humanize(queryLayerName) })
+                  : t('map.legendTitle')}{' '}
+                ({getDominantGeometry(features)})
               </span>
             </div>
             <div className="legend-item">

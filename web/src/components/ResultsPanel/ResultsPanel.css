@@ -12,6 +12,14 @@
   align-items: center;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border-color, #E0D9CE);
+  flex-shrink: 0;
+}
+
+.results-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .results-title {
@@ -29,12 +37,14 @@
 }
 
 .results-count {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #FFFFFF;
   background: var(--accent-secondary, #C2694A);
-  padding: 0.2rem 0.55rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 12px;
+  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .results-actions {
