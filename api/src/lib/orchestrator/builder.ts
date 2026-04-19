@@ -271,18 +271,21 @@ export class QueryBuilder {
     const targetLayer = this.escapeIdentifier(filter.targetLayer);
     const useProjected = this.requiresProjectedGeometry(filter.op);
     const geomField = useProjected ? 'geom_utm13' : 'geom_4326';
+    const alias = `target_geom_${useProjected ? 'utm13' : '4326'}`;
 
-    let subquery = `SELECT ST_Union_Agg(${geomField}) AS target_geom_${useProjected ? 'utm13' : '4326'} FROM ${targetLayer}`;
+    // Wrap ST_Union_Agg in COALESCE to return an empty geometry collection
+    // instead of NULL when no target rows match. DuckDB's spatial extension
+    // segfaults on ST_DWithin/ST_Intersects when passed NULL geometry.
+    let innerQuery = `SELECT ${geomField} FROM ${targetLayer}`;
 
-    // Add target filters if present
     if (filter.targetFilter && filter.targetFilter.length > 0) {
       const conditions = filter.targetFilter.map((f) =>
         this.buildAttributeCondition(f)
       );
-      subquery += ` WHERE ${conditions.join(' AND ')}`;
+      innerQuery += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    return subquery;
+    return `SELECT COALESCE(ST_Union_Agg(${geomField}), ST_GeomFromText('GEOMETRYCOLLECTION EMPTY')) AS ${alias} FROM (${innerQuery}) sub`;
   }
 
   /**
