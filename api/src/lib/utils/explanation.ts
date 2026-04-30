@@ -247,18 +247,33 @@ export async function generateEquityExplanation(
   try {
     const prompt = buildEquityPrompt(query, deterministicExplanation, count, features, lang);
     const timeoutMs = options?.timeoutMs ?? 5000;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const narrative = await Promise.race([
-      llm.complete(prompt, { temperature: 0.3, maxTokens: 300 }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('LLM explanation timed out')), timeoutMs)
-      ),
-    ]);
+    try {
+      const narrative = await Promise.race([
+        llm.complete(prompt, {
+          temperature: 0.3,
+          maxTokens: 300,
+          signal: controller.signal,
+        }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            controller.abort();
+            reject(new Error('LLM explanation timed out'));
+          }, timeoutMs);
+        }),
+      ]);
 
-    return {
-      explanation: deterministicExplanation,
-      equityNarrative: narrative.trim(),
-    };
+      return {
+        explanation: deterministicExplanation,
+        equityNarrative: narrative.trim(),
+      };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   } catch {
     // LLM unavailable or timed out — degrade gracefully
     return {

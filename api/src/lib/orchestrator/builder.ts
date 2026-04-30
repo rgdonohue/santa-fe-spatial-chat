@@ -11,6 +11,7 @@ import type {
   SpatialFilter,
 } from '../../../../shared/types/query';
 import { LAYER_SCHEMAS } from '../../../../shared/types/geo';
+import { log } from '../logger';
 
 
 interface QueryBuilderOptions {
@@ -20,6 +21,14 @@ interface QueryBuilderOptions {
 const VIRTUAL_FIELDS: Record<string, string[]> = {
   zoning_districts: ['allows_residential', 'allows_commercial'],
 };
+
+const DEFAULT_MAX_TARGET_FEATURES = 5000;
+
+function getMaxTargetFeatures(): number {
+  const raw = process.env.MAX_TARGET_FEATURES;
+  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_MAX_TARGET_FEATURES;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_TARGET_FEATURES;
+}
 
 /**
  * Query builder that converts StructuredQuery to SQL
@@ -53,7 +62,7 @@ export class QueryBuilder {
     parts.push(this.buildSelect());
 
     // FROM clause
-    parts.push(`FROM ${this.escapeIdentifier(this.query.selectLayer)}`);
+    parts.push(`FROM ${this.escapeIdentifier(this.query.selectLayer)} source`);
 
     // WHERE clause
     const whereClause = this.buildWhere();
@@ -216,41 +225,44 @@ export class QueryBuilder {
     // Validate target layer
     this.validateLayer(filter.targetLayer);
 
-    // Build subquery for target geometry
-    const targetSubquery = this.buildTargetSubquery(filter);
-
     // Choose geometry based on operation type
     const useProjected = this.requiresProjectedGeometry(filter.op);
-    const sourceGeom = useProjected ? 'geom_utm13' : 'geom_4326';
+    const sourceGeom = useProjected ? 'source.geom_utm13' : 'source.geom_4326';
+    const targetRows = this.buildTargetRowsSubquery(filter);
+    const targetGeom = useProjected ? 'target.geom_utm13' : 'target.geom_4326';
+
     switch (filter.op) {
       case 'within_distance': {
         if (!filter.distance) {
           throw new Error('within_distance requires distance parameter');
         }
         const distanceParam = this.addParam(filter.distance);
-        return `ST_DWithin(
-          ${sourceGeom},
-          (${targetSubquery}),
-          ${distanceParam}
+        return `EXISTS (
+          SELECT 1
+          FROM ${targetRows} target
+          WHERE ST_DWithin(${sourceGeom}, ${targetGeom}, ${distanceParam})
         )`;
       }
 
       case 'intersects':
-        return `ST_Intersects(
-          ${sourceGeom},
-          (${targetSubquery})
+        return `EXISTS (
+          SELECT 1
+          FROM ${targetRows} target
+          WHERE ST_Intersects(${sourceGeom}, ${targetGeom})
         )`;
 
       case 'contains':
-        return `ST_Contains(
-          ${sourceGeom},
-          (${targetSubquery})
+        return `EXISTS (
+          SELECT 1
+          FROM ${targetRows} target
+          WHERE ST_Contains(${sourceGeom}, ${targetGeom})
         )`;
 
       case 'within':
-        return `ST_Within(
-          ${sourceGeom},
-          (${targetSubquery})
+        return `EXISTS (
+          SELECT 1
+          FROM ${targetRows} target
+          WHERE ST_Within(${sourceGeom}, ${targetGeom})
         )`;
 
       case 'nearest': {
@@ -265,18 +277,13 @@ export class QueryBuilder {
   }
 
   /**
-   * Build subquery for target layer geometry
+   * Build capped target-row subquery for spatial joins.
    */
-  private buildTargetSubquery(filter: SpatialFilter): string {
+  private buildTargetRowsSubquery(filter: SpatialFilter): string {
     const targetLayer = this.escapeIdentifier(filter.targetLayer);
-    const useProjected = this.requiresProjectedGeometry(filter.op);
-    const geomField = useProjected ? 'geom_utm13' : 'geom_4326';
-    const alias = `target_geom_${useProjected ? 'utm13' : '4326'}`;
+    const maxTargetFeatures = getMaxTargetFeatures();
 
-    // Wrap ST_Union_Agg in COALESCE to return an empty geometry collection
-    // instead of NULL when no target rows match. DuckDB's spatial extension
-    // segfaults on ST_DWithin/ST_Intersects when passed NULL geometry.
-    let innerQuery = `SELECT ${geomField} FROM ${targetLayer}`;
+    let innerQuery = `SELECT geom_4326, geom_utm13 FROM ${targetLayer}`;
 
     if (filter.targetFilter && filter.targetFilter.length > 0) {
       const conditions = filter.targetFilter.map((f) =>
@@ -285,7 +292,14 @@ export class QueryBuilder {
       innerQuery += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    return `SELECT COALESCE(ST_Union_Agg(${geomField}), ST_GeomFromText('GEOMETRYCOLLECTION EMPTY')) AS ${alias} FROM (${innerQuery}) sub`;
+    log({
+      level: 'warn',
+      event: 'query.target_feature_cap',
+      targetLayer: filter.targetLayer,
+      maxTargetFeatures,
+    });
+
+    return `(${innerQuery} LIMIT ${maxTargetFeatures})`;
   }
 
   /**
@@ -353,10 +367,8 @@ export class QueryBuilder {
     this.validateLayer(this.query.selectLayer);
     this.validateLayer(nearestFilter.targetLayer);
 
-    // Build target geometry subquery
-    const sourceGeom = 'geom_utm13';
-    
-    const targetSubquery = this.buildTargetSubquery(nearestFilter);
+    const sourceGeom = 'source.geom_utm13';
+    const targetRows = this.buildTargetRowsSubquery(nearestFilter);
 
     // Build SELECT clause with distance calculation
     const fields: string[] = [];
@@ -369,9 +381,10 @@ export class QueryBuilder {
       fields.push(...this.getDefaultSelectFields(this.query.selectLayer));
     }
     
-    // Add distance calculation
-    // Note: targetSubquery returns a single geometry (ST_Union_Agg), so we can use it directly
-    fields.push(`ST_Distance(${sourceGeom}, (${targetSubquery})) AS distance`);
+    fields.push(`(
+      SELECT MIN(ST_Distance(${sourceGeom}, target.geom_utm13))
+      FROM ${targetRows} target
+    ) AS distance`);
     fields.push('ST_AsGeoJSON(geom_4326) AS geometry');
 
     // Build WHERE clause for other filters (excluding nearest)
@@ -407,7 +420,7 @@ export class QueryBuilder {
     // Build the query
     const parts: string[] = [];
     parts.push(`SELECT ${fields.join(', ')}`);
-    parts.push(`FROM ${this.escapeIdentifier(this.query.selectLayer)}`);
+    parts.push(`FROM ${this.escapeIdentifier(this.query.selectLayer)} source`);
     
     if (whereConditions.length > 0) {
       parts.push(`WHERE ${whereConditions.join(' AND ')}`);

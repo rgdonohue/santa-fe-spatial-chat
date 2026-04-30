@@ -62,7 +62,7 @@ export interface SpatialFilter {
   op: SpatialOp;
   targetLayer: string;
   targetFilter?: AttributeFilter[]; // Optional filter on target layer
-  distance?: number; // For within_distance (meters)
+  distance?: number; // For within_distance (meters); API rejects values above 50,000
   limit?: number; // For nearest
 }
 
@@ -119,4 +119,3 @@ export interface StructuredQuery {
   limit?: number; // Maximum number of results
   orderBy?: { field: string; direction: OrderDirection }; // Sort order
 }
-

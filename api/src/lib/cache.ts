@@ -187,6 +187,10 @@ function sortKeysDeep(val: unknown): unknown {
   return val;
 }
 
+export function stableJsonKey(input: unknown): string {
+  return JSON.stringify(sortKeysDeep(input));
+}
+
 /**
  * Generate a canonical cache key for a structured query.
  * Recursively sorts object keys at every depth so semantically equivalent
@@ -195,7 +199,7 @@ function sortKeysDeep(val: unknown): unknown {
  * which collapsed filter objects to {} and caused cache collisions).
  */
 export function structuredQueryKey(query: StructuredQuery): string {
-  return JSON.stringify(sortKeysDeep(query));
+  return stableJsonKey(query);
 }
 
 /**

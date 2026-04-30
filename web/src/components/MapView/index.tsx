@@ -106,6 +106,19 @@ export function MapView({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
+  const mountedRef = useRef(true);
+  const choroplethTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      for (const timeoutId of choroplethTimeouts.current) {
+        clearTimeout(timeoutId);
+      }
+      choroplethTimeouts.current = [];
+    };
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -400,28 +413,50 @@ export function MapView({
     if (!m) return;
 
     const updateChoropleth = () => {
+      if (!mountedRef.current) return;
       const layer = m.getLayer(RESULTS_FILL_LAYER);
       if (!layer) return;
 
       if (choroplethConfig) {
         // Apply data-driven color based on attribute values
         const colorExpr = buildFillColorExpression(choroplethConfig);
-        console.log('Applying choropleth:', choroplethConfig.field, colorExpr);
+        if (!mountedRef.current || !m.getLayer(RESULTS_FILL_LAYER)) return;
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', colorExpr as maplibregl.ExpressionSpecification);
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.7);
       } else {
         // Reset to default terracotta
+        if (!mountedRef.current || !m.getLayer(RESULTS_FILL_LAYER)) return;
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-color', FILL_COLOR);
         m.setPaintProperty(RESULTS_FILL_LAYER, 'fill-opacity', 0.35);
       }
     };
 
+    const scheduleUpdate = () => {
+      const timeoutId = setTimeout(() => {
+        choroplethTimeouts.current = choroplethTimeouts.current.filter(
+          (id) => id !== timeoutId
+        );
+        updateChoropleth();
+      }, 100);
+      choroplethTimeouts.current.push(timeoutId);
+    };
+
+    const onLoad = () => scheduleUpdate();
+
     // Small delay to ensure features are loaded first
     if (m.isStyleLoaded()) {
-      setTimeout(updateChoropleth, 100);
+      scheduleUpdate();
     } else {
-      m.once('load', () => setTimeout(updateChoropleth, 100));
+      m.once('load', onLoad);
     }
+
+    return () => {
+      m.off('load', onLoad);
+      for (const timeoutId of choroplethTimeouts.current) {
+        clearTimeout(timeoutId);
+      }
+      choroplethTimeouts.current = [];
+    };
   }, [choroplethConfig, features]);
 
   return (

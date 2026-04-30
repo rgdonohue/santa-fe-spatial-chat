@@ -2,8 +2,15 @@
  * API types for the Parcela frontend
  */
 
-import type { Feature, Geometry } from 'geojson';
 import type { StructuredQuery } from '../../../shared/types/query';
+import type {
+  ChatConversationContext as SharedChatConversationContext,
+  ChatRequest as SharedChatRequest,
+  ChatResponse as SharedChatResponse,
+  GroundingInfo as SharedGroundingInfo,
+  QueryMetadata as SharedQueryMetadata,
+  QueryResult as SharedQueryResult,
+} from '../../../shared/types/api';
 
 export type {
   StructuredQuery,
@@ -13,15 +20,7 @@ export type {
   TemporalQuery,
 } from '../../../shared/types/query';
 
-export interface GroundingInfo {
-  status: 'exact_match' | 'partial_match' | 'unsupported';
-  requestedConcepts: string[];
-  matchedLayers: string[];
-  missingConcepts: string[];
-  missingLayers: string[];
-  disambiguationPrompt?: string;
-  suggestions: string[];
-}
+export type GroundingInfo = SharedGroundingInfo;
 
 export interface ChatMessage {
   id: string;
@@ -36,47 +35,15 @@ export interface ChatMessage {
   error?: string;
 }
 
-export interface QueryMetadata {
-  count: number;
-  executionTimeMs: number;
-  parseTimeMs?: number;
-  queryHash?: string;
-  sourceLayers?: string[];
-  truncated?: boolean;
-  maxFeaturesApplied?: number;
-  hardCap?: number;
-  defaultLimitApplied?: boolean;
-  normalizationNotes?: string[];
-  cache?: {
-    parseHit: boolean;
-    queryHit: boolean;
-  };
-}
+export type QueryMetadata = SharedQueryMetadata;
 
-export interface QueryResult {
-  type: 'FeatureCollection';
-  features: Feature<Geometry, Record<string, unknown>>[];
-  metadata?: QueryMetadata;
-}
+export type QueryResult = SharedQueryResult;
 
-export interface ChatRequest {
-  message: string;
-  conversationId?: string;
-}
+export type ChatConversationContext = SharedChatConversationContext;
 
-export interface ChatResponse {
-  query: StructuredQuery;
-  result: QueryResult;
-  /** Short deterministic one-liner ("Found N ..."). Use for chat log. */
-  summary: string;
-  /** Full narrative — equity LLM output when available, else deterministic. Use for Results panel. */
-  explanation: string;
-  equityNarrative?: string | null;
-  confidence: number;
-  grounding: GroundingInfo;
-  metadata: QueryMetadata;
-  suggestions?: string[];
-}
+export type ChatRequest = SharedChatRequest;
+
+export type ChatResponse = SharedChatResponse;
 
 export interface QueryRequest {
   query: StructuredQuery;
@@ -87,6 +54,7 @@ export interface LayerSummary {
   geometryType: string;
   schemaFields: string[];
   isLoaded: boolean;
+  isValidated?: boolean;
   loadedFields: string[];
   featureCount: number | null;
   description?: string;

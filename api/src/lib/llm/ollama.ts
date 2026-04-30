@@ -5,7 +5,7 @@
  * Default: http://localhost:11434 with llama3.2:3b model
  */
 
-import type { LLMClient, CompletionOptions } from './types';
+import { LLMProviderError, type LLMClient, type CompletionOptions } from './types';
 
 /** Default request timeout in milliseconds (60 seconds — first query loads the model into memory) */
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -17,12 +17,15 @@ const DEFAULT_TIMEOUT_MS = 60_000;
  * Includes configurable request timeout via OLLAMA_TIMEOUT_MS env var.
  */
 export class OllamaClient implements LLMClient {
+  readonly providerName = 'ollama';
+  readonly modelName: string;
   private timeoutMs: number;
 
   constructor(
     private baseUrl: string = process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-    private model: string = process.env.OLLAMA_MODEL || 'llama3.2:3b'
+    model: string = process.env.OLLAMA_MODEL || 'llama3.2:3b'
   ) {
+    this.modelName = model;
     this.timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
   }
 
@@ -32,13 +35,19 @@ export class OllamaClient implements LLMClient {
   async complete(prompt: string, options?: CompletionOptions): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    const abortFromCaller = () => controller.abort();
+    if (options?.signal?.aborted) {
+      controller.abort();
+    } else {
+      options?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    }
 
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: this.model,
+          model: this.modelName,
           prompt,
           stream: false,
           options: {
@@ -65,23 +74,43 @@ export class OllamaClient implements LLMClient {
       return data.response;
     } catch (error) {
       if (error instanceof Error) {
+        if (error instanceof LLMProviderError) {
+          throw error;
+        }
         // Check for timeout (AbortError)
         if (error.name === 'AbortError') {
-          throw new Error(
-            `Ollama request timed out after ${this.timeoutMs}ms. The model may be loading or the query is too complex.`
+          throw new LLMProviderError(
+            `Ollama request timed out after ${this.timeoutMs}ms. The model may be loading or the query is too complex.`,
+            {
+              provider: this.providerName,
+              model: this.modelName,
+              kind: 'timeout',
+              cause: error,
+            }
           );
         }
         // Check if it's a connection error
         if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
-          throw new Error(
-            `Cannot connect to Ollama at ${this.baseUrl}. Is Ollama running?`
+          throw new LLMProviderError(
+            `Cannot connect to Ollama at ${this.baseUrl}. Is Ollama running?`,
+            {
+              provider: this.providerName,
+              model: this.modelName,
+              kind: 'network',
+              cause: error,
+            }
           );
         }
         throw error;
       }
-      throw new Error('Unknown error calling Ollama');
+      throw new LLMProviderError('Unknown error calling Ollama', {
+        provider: this.providerName,
+        model: this.modelName,
+        kind: 'provider',
+      });
     } finally {
       clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abortFromCaller);
     }
   }
 
@@ -104,4 +133,3 @@ export class OllamaClient implements LLMClient {
     }
   }
 }
-

@@ -223,6 +223,25 @@ function validateAttributeFilterTypes(
   }
 }
 
+function validateAggregateMetricType(
+  layerFieldTypes: Record<string, FieldType>,
+  fieldName: string,
+  op: string,
+  path: string,
+  issues: QueryValidationIssue[]
+): void {
+  if (!['sum', 'avg', 'median'].includes(op)) {
+    return;
+  }
+
+  if (!isNumericField(layerFieldTypes[fieldName])) {
+    issues.push({
+      path,
+      message: `Aggregate "${op}" requires a numeric field`,
+    });
+  }
+}
+
 export function validateQueryAgainstRegistry(
   query: StructuredQuery,
   registry: LayerRegistry
@@ -294,6 +313,13 @@ export function validateQueryAgainstRegistry(
         registry,
         query.selectLayer,
         metric.field,
+        `aggregate.metrics.${i}.${metric.field}`,
+        issues
+      );
+      validateAggregateMetricType(
+        primaryLayer.schemaFields,
+        metric.field,
+        metric.op,
         `aggregate.metrics.${i}.${metric.field}`,
         issues
       );

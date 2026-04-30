@@ -11,6 +11,7 @@ import i18n from '../i18n';
 import { sendChatMessage, ApiClientError } from '../lib/api';
 import type {
   ChatMessage,
+  ChatConversationContext,
   ChatResponse,
   GroundingInfo,
   QueryMetadata,
@@ -22,12 +23,7 @@ import type {
  * Summarizes the previous query so the LLM can resolve
  * references like "those", "filter further", "just the Southside".
  */
-export interface ConversationContext {
-  previousQuery: StructuredQuery;
-  previousLayer: string;
-  previousResultCount: number;
-  previousExplanation: string;
-}
+export type ConversationContext = ChatConversationContext;
 
 interface ChatState {
   // ── Chat ──
@@ -48,6 +44,7 @@ interface ChatState {
 
   // ── Multi-turn context ──
   conversationContext: ConversationContext | null;
+  requestGeneration: number;
 
   // ── Actions ──
   sendMessage: (content: string) => Promise<void>;
@@ -94,10 +91,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedFeature: null,
   showResults: false,
   conversationContext: null,
+  requestGeneration: 0,
 
   // ── Actions ──
 
   sendMessage: async (content: string) => {
+    const generation = get().requestGeneration + 1;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -108,6 +107,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isLoading: true,
+      requestGeneration: generation,
     }));
 
     const { conversationContext } = get();
@@ -119,6 +119,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversationContext ?? undefined,
         lang
       );
+
+      if (get().requestGeneration !== generation) {
+        return;
+      }
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -148,10 +152,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           previousQuery: response.query,
           previousLayer: response.query.selectLayer,
           previousResultCount: response.result.features.length,
-          previousExplanation: response.explanation,
         },
       });
     } catch (error) {
+      if (get().requestGeneration !== generation) {
+        return;
+      }
+
       let errorMessage = 'An unexpected error occurred';
       let content = 'Sorry, I encountered an error processing your request.';
       let grounding: GroundingInfo | undefined;
@@ -209,6 +216,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       selectedFeature: null,
       showResults: false,
       conversationContext: null,
+      requestGeneration: get().requestGeneration + 1,
     });
   },
 }));

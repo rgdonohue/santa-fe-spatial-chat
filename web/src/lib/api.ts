@@ -3,6 +3,7 @@
  */
 
 import type {
+  ChatConversationContext,
   ChatRequest,
   ChatResponse,
   QueryRequest,
@@ -137,25 +138,15 @@ async function apiFetch<T>(
 }
 
 /**
- * Conversation context for multi-turn refinement.
- */
-export interface ConversationContext {
-  previousQuery: StructuredQuery;
-  previousLayer: string;
-  previousResultCount: number;
-  previousExplanation: string;
-}
-
-/**
  * Send a natural language chat message, optionally with conversation context
  * for multi-turn refinement ("filter those to...", "now show just...").
  */
 export async function sendChatMessage(
   message: string,
-  context?: ConversationContext,
+  context?: ChatConversationContext,
   lang: 'en' | 'es' = 'en'
 ): Promise<ChatResponse> {
-  const request: ChatRequest & { context?: ConversationContext; lang?: string } = {
+  const request: ChatRequest = {
     message,
     context,
     lang,

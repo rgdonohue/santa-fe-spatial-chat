@@ -9,7 +9,7 @@
  * Optional: TOGETHER_TIMEOUT_MS (default: 30000)
  */
 
-import type { LLMClient, CompletionOptions } from './types';
+import { LLMProviderError, type LLMClient, type CompletionOptions } from './types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MODEL = 'Qwen/Qwen2.5-7B-Instruct';
@@ -29,8 +29,9 @@ interface TogetherErrorBody {
 }
 
 export class TogetherClient implements LLMClient {
+  readonly providerName = 'together';
   private apiKey: string;
-  private model: string;
+  readonly modelName: string;
   private timeoutMs: number;
   private baseUrl: string;
 
@@ -41,7 +42,7 @@ export class TogetherClient implements LLMClient {
     baseUrl?: string;
   }) {
     this.apiKey = options?.apiKey ?? process.env.TOGETHER_API_KEY ?? '';
-    this.model = options?.model ?? process.env.TOGETHER_MODEL ?? DEFAULT_MODEL;
+    this.modelName = options?.model ?? process.env.TOGETHER_MODEL ?? DEFAULT_MODEL;
     this.timeoutMs = options?.timeoutMs ?? (Number(process.env.TOGETHER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
     this.baseUrl = options?.baseUrl ?? 'https://api.together.xyz/v1';
 
@@ -55,6 +56,12 @@ export class TogetherClient implements LLMClient {
   async complete(prompt: string, options?: CompletionOptions): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    const abortFromCaller = () => controller.abort();
+    if (options?.signal?.aborted) {
+      controller.abort();
+    } else {
+      options?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    }
 
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -64,7 +71,7 @@ export class TogetherClient implements LLMClient {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: this.model,
+          model: this.modelName,
           messages: [
             {
               role: 'user',
@@ -88,14 +95,30 @@ export class TogetherClient implements LLMClient {
           // Ignore parse failures on error bodies
         }
 
-        if (response.status === 401) {
-          throw new Error('Together.ai authentication failed. Check your TOGETHER_API_KEY.');
+        if (response.status === 401 || response.status === 403) {
+          throw new LLMProviderError('LLM authentication failure', {
+            provider: this.providerName,
+            model: this.modelName,
+            kind: 'auth',
+            statusCode: response.status,
+          });
         }
         if (response.status === 429) {
-          throw new Error('Together.ai rate limit exceeded. Try again shortly.');
+          throw new LLMProviderError('LLM provider rate limit exceeded', {
+            provider: this.providerName,
+            model: this.modelName,
+            kind: 'rate_limit',
+            statusCode: response.status,
+            retryAfter: response.headers.get('retry-after') ?? undefined,
+          });
         }
 
-        throw new Error(`Together.ai API error: ${errorDetail}`);
+        throw new LLMProviderError(`Together.ai API error: ${errorDetail}`, {
+          provider: this.providerName,
+          model: this.modelName,
+          kind: 'provider',
+          statusCode: response.status,
+        });
       }
 
       const data = (await response.json()) as TogetherResponse;
@@ -108,19 +131,38 @@ export class TogetherClient implements LLMClient {
       return content;
     } catch (error) {
       if (error instanceof Error) {
+        if (error instanceof LLMProviderError) {
+          throw error;
+        }
         if (error.name === 'AbortError') {
-          throw new Error(
-            `Together.ai request timed out after ${this.timeoutMs}ms`
+          throw new LLMProviderError(
+            `Together.ai request timed out after ${this.timeoutMs}ms`,
+            {
+              provider: this.providerName,
+              model: this.modelName,
+              kind: 'timeout',
+              cause: error,
+            }
           );
         }
         if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
-          throw new Error('Cannot connect to Together.ai API. Check network connectivity.');
+          throw new LLMProviderError('Cannot connect to Together.ai API. Check network connectivity.', {
+            provider: this.providerName,
+            model: this.modelName,
+            kind: 'network',
+            cause: error,
+          });
         }
         throw error;
       }
-      throw new Error('Unknown error calling Together.ai');
+      throw new LLMProviderError('Unknown error calling Together.ai', {
+        provider: this.providerName,
+        model: this.modelName,
+        kind: 'provider',
+      });
     } finally {
       clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abortFromCaller);
     }
   }
 }

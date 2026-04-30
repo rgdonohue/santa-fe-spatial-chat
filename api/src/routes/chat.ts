@@ -7,15 +7,17 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { createLLMClient } from '../lib/llm';
+import { LLMProviderError } from '../lib/llm/types';
 import { IntentParser } from '../lib/orchestrator/parser';
 import {
   parseCache,
-  getCacheStats,
+  stableJsonKey,
 } from '../lib/cache';
 import type { LayerRegistry } from '../lib/layers/registry';
 import type { Database } from 'duckdb';
 import type { ParseResult, ConversationContext } from '../lib/orchestrator/parser';
-import type { StructuredQuery } from '../../../shared/types/query';
+import type { ChatRequest, ChatResponse } from '../../../shared/types/api';
+import { structuredQuerySchema } from '../lib/orchestrator/validator';
 import {
   getQuerySourceLayers,
 } from '../lib/orchestrator/query-grounding';
@@ -26,6 +28,7 @@ import {
 import { prepareQuery, executeQuery } from '../lib/utils/query-executor';
 import { generateExplanation, generateEquityExplanation } from '../lib/utils/explanation';
 import { log } from '../lib/logger';
+import { getRequestId } from '../lib/request-id';
 
 // ── Request validation schema ─────────────────────────────────────────────────
 const chatBodySchema = z.object({
@@ -33,21 +36,85 @@ const chatBodySchema = z.object({
   lang: z.enum(['en', 'es']).optional(),
   context: z
     .object({
-      previousQuery: z.record(z.string(), z.unknown()),
+      previousQuery: structuredQuerySchema,
       previousLayer: z.string(),
       previousResultCount: z.number(),
-      previousExplanation: z.string(),
     })
     .optional(),
-});
+}) satisfies z.ZodType<ChatRequest>;
 
 let dbInstance: Database | null = null;
 let layerRegistry: LayerRegistry | null = null;
 
 const chatRoute = new Hono();
 
-const llmClient = createLLMClient();
-const parser = new IntentParser(llmClient);
+let llmClient = createLLMClient();
+let parser = new IntentParser(llmClient);
+
+function getLLMMetadata(): { llmProvider: string; llmModel: string } {
+  return {
+    llmProvider: llmClient.providerName ?? 'unknown',
+    llmModel: llmClient.modelName ?? 'unknown',
+  };
+}
+
+function classifyLLMFailure(error: unknown): {
+  status: 500 | 502 | 503;
+  error: string;
+  message: string;
+  retryAfter?: string;
+  statusCode?: number;
+} | null {
+  if (error instanceof LLMProviderError) {
+    if (error.kind === 'auth') {
+      return {
+        status: 502,
+        error: 'LLM authentication failure',
+        message: 'The configured LLM provider rejected the API credentials.',
+        statusCode: error.statusCode,
+      };
+    }
+    if (error.kind === 'rate_limit') {
+      return {
+        status: 503,
+        error: 'LLM provider rate limited',
+        message: 'The LLM provider is rate limiting requests.',
+        retryAfter: error.retryAfter,
+        statusCode: error.statusCode,
+      };
+    }
+    if (error.kind === 'network' || error.kind === 'timeout') {
+      return {
+        status: 503,
+        error: 'LLM service unavailable',
+        message: error.message,
+        statusCode: error.statusCode,
+      };
+    }
+    return {
+      status: 500,
+      error: 'LLM provider failure',
+      message: error.message,
+      statusCode: error.statusCode,
+    };
+  }
+
+  if (error instanceof Error) {
+    const modelFailure =
+      error.message.includes('LLM did not return valid JSON') ||
+      error.message.includes('Failed to parse JSON from LLM response') ||
+      error.message.includes('Query validation failed');
+    if (modelFailure) {
+      return {
+        status: 500,
+        error: 'LLM model error',
+        message: 'The LLM returned an invalid structured query.',
+      };
+    }
+  }
+
+  return null;
+}
 
 export function setDatabase(db: Database): void {
   dbInstance = db;
@@ -62,6 +129,14 @@ export function setLayerRegistry(registry: LayerRegistry): void {
     )
   );
   log({ level: 'info', event: 'chat.config', layers: registry.loadedLayerNames });
+}
+
+export function setLLMClientForTests(client: typeof llmClient): void {
+  llmClient = client;
+  parser = new IntentParser(llmClient);
+  if (layerRegistry) {
+    setLayerRegistry(layerRegistry);
+  }
 }
 
 function generateDynamicSuggestions(availableLayers: string[]): string[] {
@@ -126,6 +201,8 @@ function unsupportedResponse(
 }
 
 chatRoute.post('/', async (c) => {
+  const requestId = getRequestId(c.req.raw);
+  const llmMetadata = getLLMMetadata();
   if (!dbInstance) {
     return c.json({ error: 'Database not initialized' }, 503);
   }
@@ -152,9 +229,7 @@ chatRoute.post('/', async (c) => {
     const lang: 'en' | 'es' = body.lang
       ?? (acceptLang.toLowerCase().startsWith('es') ? 'es' : 'en');
 
-    const conversationContext: ConversationContext | null = body.context
-      ? (body.context as unknown as ConversationContext)
-      : null;
+    const conversationContext: ConversationContext | null = body.context ?? null;
     const availableLayers = layerRegistry.loadedLayerNames;
     const grounding = assessGroundingRequest(body.message, availableLayers);
     if (grounding.disambiguationPrompt) {
@@ -177,34 +252,53 @@ chatRoute.post('/', async (c) => {
     let parseTimeMs = 0;
     let parseCacheHit = false;
 
-    const cachedParse = parseCache.get(body.message);
+    const parseCacheKey = stableJsonKey({
+      message: body.message,
+      lang,
+      previousQuery: conversationContext?.previousQuery ?? null,
+    });
+    const cachedParse = parseCache.get(parseCacheKey);
     if (cachedParse) {
       parseResult = cachedParse;
       parseCacheHit = true;
     } else {
       try {
         const parseStart = performance.now();
+        // Trust boundary: parser.parse builds the only LLM prompt for NL parsing.
+        // It receives raw user text as delimited data plus validated structured
+        // context; client-supplied explanation text is never forwarded.
         parseResult = await parser.parse(body.message, conversationContext, lang);
         parseTimeMs = performance.now() - parseStart;
-        parseCache.set(body.message, parseResult);
+        parseCache.set(parseCacheKey, parseResult);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown parsing error';
-        if (errorMessage.includes('Cannot connect to Ollama') || errorMessage.includes('timed out')) {
+        const failure = classifyLLMFailure(error);
+        if (failure) {
+          log({
+            level: 'error',
+            event: 'llm.failure',
+            phase: 'parse',
+            requestId,
+            ...llmMetadata,
+            statusCode: failure.statusCode,
+            httpStatus: failure.status,
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+          if (failure.retryAfter) {
+            c.header('Retry-After', failure.retryAfter);
+          }
           return c.json(
             {
-              error: 'LLM service unavailable',
-              message: errorMessage,
+              error: failure.error,
+              message: failure.message,
               grounding,
-              suggestions: [
-                'Make sure Ollama is installed and running',
-                'Check that the model is pulled: ollama pull qwen2.5:7b',
-              ],
+              suggestions: generateDynamicSuggestions(availableLayers),
             },
-            503
+            failure.status
           );
         }
 
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown parsing error';
         return c.json(
           {
             error: 'Could not understand query',
@@ -220,7 +314,10 @@ chatRoute.post('/', async (c) => {
     log({
       level: 'info',
       event: 'chat.parse',
+      requestId,
       parseTimeMs: Math.round(parseTimeMs * 100) / 100,
+      llmLatencyMs: Math.round(parseTimeMs * 100) / 100,
+      ...llmMetadata,
       parseCacheHit,
       confidence: parseResult.confidence,
     });
@@ -251,6 +348,7 @@ chatRoute.post('/', async (c) => {
     log({
       level: 'info',
       event: 'chat.execute',
+      requestId,
       executionTimeMs: Math.round(executionTimeMs * 100) / 100,
       queryCacheHit,
       featureCount: result.features.length,
@@ -266,7 +364,9 @@ chatRoute.post('/', async (c) => {
 
     // Attempt LLM equity explanation (5s timeout); fall back to deterministic on failure
     let equityNarrative: string | null = null;
+    let equityLatencyMs = 0;
     try {
+      const equityStart = performance.now();
       const equity = await generateEquityExplanation(
         llmClient,
         prepared.executableQuery,
@@ -274,22 +374,34 @@ chatRoute.post('/', async (c) => {
         result.features as Array<{ properties: Record<string, unknown> | null }>,
         { timeoutMs: 12_000, lang }
       );
+      equityLatencyMs = performance.now() - equityStart;
       equityNarrative = equity.equityNarrative;
-    } catch {
+    } catch (error) {
+      log({
+        level: 'warn',
+        event: 'llm.failure',
+        phase: 'equity',
+        requestId,
+        ...llmMetadata,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
       // Graceful degradation — equity narrative is optional
     }
 
     log({
       level: 'info',
       event: 'chat.equity',
+      requestId,
+      llmLatencyMs: Math.round(equityLatencyMs * 100) / 100,
+      ...llmMetadata,
       equityNarrativeReturned: equityNarrative !== null,
     });
 
     const explanation = equityNarrative ?? deterministicExplanation;
 
-    return c.json({
+    const response: ChatResponse = {
       query: prepared.executableQuery,
-      result,
+      result: result as ChatResponse['result'],
       summary: deterministicExplanation,
       explanation,
       equityNarrative,
@@ -311,12 +423,15 @@ chatRoute.post('/', async (c) => {
           queryHit: queryCacheHit,
         },
       },
-    });
+    };
+
+    return c.json(response);
   } catch (error) {
     if (error instanceof Error) {
       log({
         level: 'error',
         event: 'chat.error',
+        requestId,
         errorType: error.name,
         errorMessage: error.message,
       });
@@ -329,15 +444,9 @@ chatRoute.post('/', async (c) => {
       );
     }
 
-    log({ level: 'error', event: 'chat.error', errorType: 'unknown', errorMessage: 'Unknown error' });
+    log({ level: 'error', event: 'chat.error', requestId, errorType: 'unknown', errorMessage: 'Unknown error' });
     return c.json({ error: 'Unknown error' }, 500);
   }
-});
-
-chatRoute.get('/stats', (c) => {
-  return c.json({
-    cache: getCacheStats(),
-  });
 });
 
 export default chatRoute;

@@ -1,82 +1,130 @@
 {
   "_meta": {
-    "purpose": "Bilingual display labels for layer fields. Use to localize column headers, tooltips, and property rows. Keys are `{layer}.{field}`; unknown keys should fall back to humanized column name.",
-    "notes": "Spanish labels use New Mexican conventions where applicable (e.g., 'parcela', 'acequia', 'arroyo'). Keep labels short — they appear in table headers."
+    "purpose": "Bilingual display labels for layer fields. Keys are `{layer}.{field}` and must match shared/types/geo.ts layer names.",
+    "notes": "Unknown keys fall back to humanized column names."
   },
   "parcels": {
     "parcel_id": { "en": "Parcel ID", "es": "Id. de parcela" },
-    "owner_name": { "en": "Owner", "es": "Propietario" },
     "address": { "en": "Address", "es": "Dirección" },
-    "zoning": { "en": "Zoning", "es": "Zonificación" },
-    "land_use": { "en": "Land use", "es": "Uso del suelo" },
-    "assessed_value": { "en": "Assessed value", "es": "Valor tasado" },
-    "year_built": { "en": "Year built", "es": "Año de construcción" },
     "acres": { "en": "Acres", "es": "Acres" },
-    "is_vacant": { "en": "Vacant", "es": "Baldía" },
-    "neighborhood": { "en": "Neighborhood", "es": "Barrio" }
+    "assessed_value": { "en": "Assessed value", "es": "Valor tasado" }
   },
   "census_tracts": {
     "geoid": { "en": "GEOID", "es": "GEOID" },
-    "tract_name": { "en": "Tract", "es": "Sector censal" },
-    "median_income": { "en": "Median income", "es": "Ingreso mediano" },
+    "name": { "en": "Tract", "es": "Sector censal" },
     "total_population": { "en": "Population", "es": "Población" },
-    "pct_hispanic": { "en": "% Hispanic/Latino", "es": "% Hispano/Latino" },
+    "median_income": { "en": "Median income", "es": "Ingreso mediano" },
+    "median_age": { "en": "Median age", "es": "Edad mediana" },
     "pct_renter": { "en": "% Renters", "es": "% Inquilinos" },
-    "median_home_value": { "en": "Median home value", "es": "Valor mediano de vivienda" }
-  },
-  "zoning": {
-    "zone_code": { "en": "Zone code", "es": "Código de zona" },
-    "zone_description": { "en": "Zone description", "es": "Descripción de zona" },
-    "district": { "en": "District", "es": "Distrito" }
-  },
-  "neighborhoods": {
-    "name": { "en": "Neighborhood", "es": "Barrio" },
-    "area_acres": { "en": "Area (acres)", "es": "Superficie (acres)" }
+    "total_housing_units": { "en": "Housing units", "es": "Viviendas" },
+    "owner_occupied_units": { "en": "Owner occupied", "es": "Ocupadas por dueño" },
+    "renter_occupied_units": { "en": "Renter occupied", "es": "Ocupadas por inquilino" },
+    "vacant_units": { "en": "Vacant units", "es": "Viviendas vacantes" }
   },
   "hydrology": {
-    "feature_type": { "en": "Water feature", "es": "Tipo de agua" },
     "name": { "en": "Name", "es": "Nombre" },
-    "is_arroyo": { "en": "Arroyo", "es": "Arroyo" },
-    "is_acequia": { "en": "Acequia", "es": "Acequia" }
+    "type": { "en": "Water feature", "es": "Tipo de agua" },
+    "length_km": { "en": "Length", "es": "Longitud" }
   },
-  "flood_zones": {
-    "zone": { "en": "FEMA zone", "es": "Zona FEMA" },
-    "sfha": { "en": "Special flood hazard", "es": "Peligro especial de inundación" }
-  },
-  "transit": {
-    "stop_name": { "en": "Stop name", "es": "Nombre de parada" },
-    "route": { "en": "Route", "es": "Ruta" },
-    "stop_id": { "en": "Stop ID", "es": "Id. de parada" }
-  },
-  "short_term_rentals": {
-    "permit_number": { "en": "Permit number", "es": "Número de permiso" },
-    "status": { "en": "Status", "es": "Estado" },
-    "accommodates": { "en": "Sleeps", "es": "Capacidad" },
-    "price_per_night": { "en": "Price / night", "es": "Precio por noche" }
-  },
-  "affordable_housing": {
-    "project_name": { "en": "Project", "es": "Proyecto" },
-    "units": { "en": "Units", "es": "Unidades" },
-    "program": { "en": "Program", "es": "Programa" }
-  },
-  "parks": {
-    "name": { "en": "Park", "es": "Parque" },
-    "acres": { "en": "Acres", "es": "Acres" },
-    "type": { "en": "Type", "es": "Tipo" }
-  },
-  "bikeways": {
-    "route_name": { "en": "Route", "es": "Ruta" },
-    "facility_type": { "en": "Facility", "es": "Tipo de ciclovía" },
-    "trail_miles": { "en": "Miles", "es": "Millas" }
-  },
-  "historic_districts": {
-    "district_name": { "en": "Historic district", "es": "Distrito histórico" }
-  },
-  "city_limits": {
-    "name": { "en": "Name", "es": "Nombre" }
+  "zoning_districts": {
+    "zone_code": { "en": "Zone code", "es": "Código de zona" },
+    "zone_name": { "en": "Zone name", "es": "Nombre de zona" },
+    "allows_residential": { "en": "Allows residential", "es": "Permite vivienda" },
+    "allows_commercial": { "en": "Allows commercial", "es": "Permite comercio" }
   },
   "building_footprints": {
-    "height_m": { "en": "Height (m)", "es": "Altura (m)" },
-    "footprint_area": { "en": "Footprint area", "es": "Superficie de huella" }
+    "building_id": { "en": "Building ID", "es": "Id. de edificio" },
+    "address": { "en": "Address", "es": "Dirección" },
+    "height": { "en": "Height", "es": "Altura" },
+    "source": { "en": "Source", "es": "Fuente" }
+  },
+  "short_term_rentals": {
+    "listing_id": { "en": "Listing ID", "es": "Id. de anuncio" },
+    "address": { "en": "Address", "es": "Dirección" },
+    "business_name": { "en": "Business name", "es": "Nombre del negocio" },
+    "permit_issued_date": { "en": "Permit issued", "es": "Permiso emitido" },
+    "permit_expiry_date": { "en": "Permit expires", "es": "Permiso vence" }
+  },
+  "vacancy_status": {
+    "parcel_id": { "en": "Parcel ID", "es": "Id. de parcela" },
+    "vacancy_type": { "en": "Vacancy type", "es": "Tipo de vacancia" },
+    "vacant": { "en": "Vacant", "es": "Vacante" },
+    "vacant_since": { "en": "Vacant since", "es": "Vacante desde" },
+    "source": { "en": "Source", "es": "Fuente" }
+  },
+  "affordable_housing_units": {
+    "unit_id": { "en": "Unit ID", "es": "Id. de unidad" },
+    "property_name": { "en": "Property", "es": "Propiedad" },
+    "address": { "en": "Address", "es": "Dirección" },
+    "total_units": { "en": "Total units", "es": "Unidades totales" },
+    "affordable_units": { "en": "Affordable units", "es": "Unidades asequibles" },
+    "income_restriction_pct_ami": { "en": "AMI restriction", "es": "Restricción AMI" },
+    "deed_restricted": { "en": "Deed restricted", "es": "Restricción en escritura" },
+    "restriction_expires": { "en": "Restriction expires", "es": "Restricción vence" },
+    "property_type": { "en": "Property type", "es": "Tipo de propiedad" }
+  },
+  "eviction_filings": {
+    "filing_id": { "en": "Filing ID", "es": "Id. de caso" },
+    "case_number": { "en": "Case number", "es": "Número de caso" },
+    "filing_date": { "en": "Filing date", "es": "Fecha de caso" },
+    "address": { "en": "Address", "es": "Dirección" },
+    "unit_number": { "en": "Unit", "es": "Unidad" },
+    "eviction_type": { "en": "Eviction type", "es": "Tipo de desalojo" },
+    "outcome": { "en": "Outcome", "es": "Resultado" }
+  },
+  "transit_access": {
+    "stop_id": { "en": "Stop ID", "es": "Id. de parada" },
+    "stop_type": { "en": "Stop type", "es": "Tipo de parada" }
+  },
+  "school_zones": {
+    "zone_id": { "en": "Zone ID", "es": "Id. de zona" },
+    "school_name": { "en": "School", "es": "Escuela" },
+    "school_type": { "en": "School type", "es": "Tipo de escuela" },
+    "district": { "en": "District", "es": "Distrito" },
+    "grades": { "en": "Grades", "es": "Grados" }
+  },
+  "historic_districts": {
+    "district_id": { "en": "District ID", "es": "Id. de distrito" },
+    "district_name": { "en": "Historic district", "es": "Distrito histórico" },
+    "designation_type": { "en": "Designation", "es": "Designación" }
+  },
+  "flood_zones": {
+    "zone_id": { "en": "Zone ID", "es": "Id. de zona" },
+    "zone_code": { "en": "FEMA zone", "es": "Zona FEMA" },
+    "zone_name": { "en": "Zone name", "es": "Nombre de zona" },
+    "flood_risk_level": { "en": "Flood risk", "es": "Riesgo de inundación" },
+    "base_flood_elevation": { "en": "Base flood elevation", "es": "Elevación base" },
+    "source": { "en": "Source", "es": "Fuente" }
+  },
+  "wildfire_risk": {
+    "zone_id": { "en": "Zone ID", "es": "Id. de zona" },
+    "risk_level": { "en": "Risk level", "es": "Nivel de riesgo" },
+    "fuel_model": { "en": "Fuel model", "es": "Modelo de combustible" },
+    "source": { "en": "Source", "es": "Fuente" }
+  },
+  "neighborhoods": {
+    "neighborhood_id": { "en": "Neighborhood ID", "es": "Id. de barrio" },
+    "name": { "en": "Neighborhood", "es": "Barrio" },
+    "type": { "en": "Type", "es": "Tipo" },
+    "established_date": { "en": "Established", "es": "Establecido" },
+    "notes": { "en": "Notes", "es": "Notas" }
+  },
+  "city_limits": {
+    "boundary_id": { "en": "Boundary ID", "es": "Id. de límite" },
+    "name": { "en": "Name", "es": "Nombre" },
+    "area_sq_mi": { "en": "Area (sq mi)", "es": "Área (mi²)" },
+    "area_acres": { "en": "Area (acres)", "es": "Área (acres)" }
+  },
+  "parks": {
+    "park_id": { "en": "Park ID", "es": "Id. de parque" },
+    "name": { "en": "Park", "es": "Parque" },
+    "park_type": { "en": "Park type", "es": "Tipo de parque" },
+    "owner": { "en": "Owner", "es": "Propietario" },
+    "acres": { "en": "Acres", "es": "Acres" },
+    "council_district": { "en": "Council district", "es": "Distrito municipal" }
+  },
+  "bikeways": {
+    "bikeway_id": { "en": "Bikeway ID", "es": "Id. de ciclovía" },
+    "name": { "en": "Name", "es": "Nombre" }
   }
 }
