@@ -38,6 +38,7 @@ const mockResponse: ChatResponse = {
       },
     ],
   },
+  summary: 'Found 1 parcels where assessed value greater than 500000.',
   explanation: 'Found 1 parcels where assessed value greater than 500000.',
   confidence: 0.8,
   grounding: {
@@ -60,6 +61,7 @@ function getState() {
 
 describe('Chat store', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     // Reset store between tests
     getState().clearConversation();
   });
@@ -110,6 +112,53 @@ describe('Chat store', () => {
     expect(state.currentQuery?.selectLayer).toBe('parcels');
     expect(state.showResults).toBe(true);
     expect(state.isLoading).toBe(false);
+  });
+
+  it('keeps only the newest concurrent sendMessage response', async () => {
+    const { sendChatMessage } = await import('../src/lib/api');
+    const firstResponse: ChatResponse = {
+      ...mockResponse,
+      query: { selectLayer: 'parcels', limit: 1 },
+      summary: 'First response',
+      explanation: 'First response',
+      result: { ...mockResponse.result, features: [] },
+      metadata: { count: 0, executionTimeMs: 10 },
+    };
+    const secondResponse: ChatResponse = {
+      ...mockResponse,
+      query: { selectLayer: 'parks', limit: 1 },
+      summary: 'Second response',
+      explanation: 'Second response',
+      metadata: { count: 1, executionTimeMs: 5 },
+    };
+    let resolveFirst: (value: ChatResponse) => void = () => {};
+    let resolveSecond: (value: ChatResponse) => void = () => {};
+    const firstPromise = new Promise<ChatResponse>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondPromise = new Promise<ChatResponse>((resolve) => {
+      resolveSecond = resolve;
+    });
+    vi.mocked(sendChatMessage)
+      .mockReturnValueOnce(firstPromise)
+      .mockReturnValueOnce(secondPromise);
+
+    const firstSend = getState().sendMessage('first');
+    const secondSend = getState().sendMessage('second');
+    resolveSecond(secondResponse);
+    await secondSend;
+    resolveFirst(firstResponse);
+    await firstSend;
+
+    const state = getState();
+    expect(state.currentQuery?.selectLayer).toBe('parks');
+    expect(state.explanation).toBe('Second response');
+    expect(state.queryMetadata?.executionTimeMs).toBe(5);
+    expect(state.messages.map((message) => message.content)).toEqual([
+      'first',
+      'second',
+      'Second response',
+    ]);
   });
 
   it('tracks conversation context after successful query', async () => {

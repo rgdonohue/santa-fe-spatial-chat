@@ -122,6 +122,25 @@ describe('/api/query', () => {
     expect(body.metadata.requestFormat).toBe('direct');
   });
 
+  it('returns 400 for within_distance filters without distance', async () => {
+    const response = await app.request('/api/query', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          selectLayer: 'parcels',
+          spatialFilters: [{ op: 'within_distance', targetLayer: 'transit_access' }],
+          limit: 5,
+        },
+      }),
+    });
+
+    const body = (await response.json()) as { error: string; details: string[] };
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Invalid query payload');
+    expect(body.details.join(' ')).toContain('within_distance spatial filters require distance');
+  });
+
   it('returns truncation metadata when limit exceeds hard cap', async () => {
     const response = await app.request('/api/query', {
       method: 'POST',

@@ -135,4 +135,7 @@ async function fetchLayer(): Promise<void> {
   console.log(`\nWrote ${allFeatures.length} park features to ${OUTPUT_FILE}`);
 }
 
-fetchLayer().catch(console.error);
+fetchLayer().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

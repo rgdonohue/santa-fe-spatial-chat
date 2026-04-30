@@ -233,7 +233,7 @@ parcela/
 │   │   │   ├── db/             # DuckDB setup and queries
 │   │   │   └── utils/          # Explanation, logging, query executor
 │   │   └── types/          # TypeScript types
-│   ├── tests/              # Vitest test suites (91 tests)
+│   ├── tests/              # Vitest test suites (88 API + 37 web tests)
 │   └── data/               # GeoParquet data files + manifest
 │
 ├── web/                    # Frontend (React + MapLibre)

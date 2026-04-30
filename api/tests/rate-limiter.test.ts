@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { RateLimiter } from '../src/lib/middleware/rate-limiter';
+import { Hono } from 'hono';
+import { RateLimiter, createRateLimitMiddleware } from '../src/lib/middleware/rate-limiter';
 
 afterEach(() => {
   vi.useRealTimers();
+  delete process.env.TRUSTED_PROXY_COUNT;
 });
 
 describe('RateLimiter', () => {
@@ -97,5 +99,22 @@ describe('RateLimiter', () => {
 
     // After pruning, a fresh window opens
     expect(limiter.check('ip1').allowed).toBe(true);
+  });
+
+  it('does not allow spoofed X-Forwarded-For values to bypass when no proxy is trusted', async () => {
+    process.env.TRUSTED_PROXY_COUNT = '0';
+    const app = new Hono();
+    app.use('/limited', createRateLimitMiddleware(new RateLimiter(1, 60_000)));
+    app.get('/limited', (c) => c.text('ok'));
+
+    const first = await app.request('/limited', {
+      headers: { 'x-forwarded-for': '198.51.100.1' },
+    });
+    const second = await app.request('/limited', {
+      headers: { 'x-forwarded-for': '198.51.100.2' },
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
   });
 });

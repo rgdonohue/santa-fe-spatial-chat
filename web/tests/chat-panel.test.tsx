@@ -27,7 +27,7 @@ describe('ChatPanel', () => {
   it('shows example queries when no messages', () => {
     render(<ChatPanel {...defaultProps} />);
 
-    expect(screen.getByText(/median income is below 40000/i)).toBeInTheDocument();
+    expect(screen.getByText(/median income is below \$40,000/i)).toBeInTheDocument();
     expect(screen.getByText(/parks larger than 10 acres/i)).toBeInTheDocument();
   });
 
@@ -43,20 +43,18 @@ describe('ChatPanel', () => {
 
     render(<ChatPanel {...defaultProps} messages={messages} />);
 
-    expect(screen.queryByText(/median income is below 40000/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/median income is below \$40,000/i)).not.toBeInTheDocument();
   });
 
   it('populates input when example query clicked', () => {
     render(<ChatPanel {...defaultProps} />);
 
     const buttons = screen.getAllByRole('button');
-    const exampleBtn = buttons.find((btn) =>
-      btn.textContent?.includes('1 million dollars')
-    );
+    const exampleBtn = buttons.find((btn) => btn.textContent?.includes('$1 million'));
     fireEvent.click(exampleBtn!);
 
     expect(screen.getByRole('textbox')).toHaveValue(
-      'Parcels with assessed value over 1 million dollars'
+      'Parcels with assessed value over $1 million'
     );
   });
 
@@ -157,6 +155,6 @@ describe('ChatPanel', () => {
   it('shows loading indicator with sr-only text', () => {
     render(<ChatPanel {...defaultProps} isLoading={true} />);
 
-    expect(screen.getByText('Processing your query...')).toBeInTheDocument();
+    expect(screen.getAllByText(/Processing your query/)[0]).toBeInTheDocument();
   });
 });
